@@ -1,53 +1,168 @@
 <!doctype html>
-<html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="theme-color" content="#071b2b"><title>GamaLab | Laboratório coletivo de chuva</title>
-<meta name="description" content="Simulação coletiva e acessível da distribuição gama em uma aula de probabilidade.">
-<script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script defer src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-<script defer src="./config.js"></script>
-<link rel="stylesheet" href="./styles.css">
-<script defer src="./app.js"></script></head>
-<body><a class="skip" href="#main">Ir para o conteúdo</a>
-<header><a href="./" class="logo">◈ Gama<span>Lab</span></a><small>LABORATÓRIO DE PROBABILIDADE · DISTRIBUIÇÃO GAMA</small><strong id="connection">Pronto para começar</strong></header>
-<main id="main">
-<section id="home" class="screen wrap">
-<div class="hero"><p class="tag">EXPERIMENTO COLETIVO · SEM INSTALAÇÃO</p><h1>Milhares de gotas.<br><em>Uma distribuição.</em></h1><p>Simule volumes de chuva pelo celular e veja os resultados de toda a turma aparecerem no gráfico do professor.</p></div>
-<div class="duo">
-<section class="panel"><div class="label">PARA QUEM APRESENTA</div><h2>Criar uma sala</h2><p>Compartilhe um QR code e acompanhe a distribuição gama se formando.</p><form id="create-form"><label for="pin">Senha do professor</label><input id="pin" type="password" required autocomplete="off" placeholder="Configurada no Supabase"><button type="submit" class="primary">Criar sala →</button></form></section>
-<section class="panel"><div class="label">PARA OS ALUNOS</div><h2>Entrar no experimento</h2><p>Escaneie o QR code ou digite o código da sala.</p><form id="join-form"><label for="join-code">Código da sala</label><input id="join-code" maxlength="8" minlength="8" pattern="[0-9a-fA-F]{8}" required placeholder="Ex.: A13F0C8D"><button type="submit">Participar →</button></form></section>
-</div><p id="setup-note" class="note" hidden>O Supabase ainda não está configurado. Você pode explorar uma demonstração local, mas os dados não serão compartilhados.</p><button id="demo" class="linkbtn">Explorar demonstração local ↗</button><p class="muted">Sem login · Não coletamos nomes ou e-mails · É necessário acesso à internet para participar da sala coletiva.</p>
-</section>
-<section id="host" class="screen wrap" hidden>
-<div class="heading"><div><div class="label">PAINEL DO APRESENTADOR <b id="demo-tag" hidden>· DEMONSTRAÇÃO LOCAL</b></div><h1>Chuva em <em>tempo real.</em></h1><p>Observe a diferença entre a amostra da turma e a distribuição teórica.</p></div><div><strong id="room-status">Sala aberta</strong> <button id="back-host" class="small">Voltar</button></div></div>
-<div class="hostgrid"><aside>
-<section class="panel"><div class="label">PARTICIPE PELO CELULAR</div><h2>Entre no experimento</h2><div id="qr" class="qr" role="img" aria-label="QR code; use também o link textual logo abaixo"></div><div id="host-code" class="code">--------</div><a id="invite" class="invite" href="#">Link para alunos</a><button id="copy" class="small">Copiar link</button></section>
-<section class="panel"><div class="label">CONTROLE DO PROFESSOR</div><h2>Configuração</h2>
-<form id="settings">
-<label for="mode">Experimento</label><select id="mode"><option value="dia">Dia chuvoso — Gama</option><option value="mes">Janeiro — 31 dias, incluindo dias secos</option></select>
-<div class="pair"><div><label for="alpha">Forma α</label><input id="alpha" type="number" min=".2" max="8" step=".1" value=".8"></div><div><label for="theta">Escala θ (mm)</label><input id="theta" type="number" min=".5" max="100" step=".5" value="15"></div></div>
-<div id="dry-wrap"><label for="dry">Chance de dia seco (%)</label><input id="dry" type="number" min="0" max="95" step="1" value="45"></div>
-<div class="pair"><div><label for="a">Limite 1 (mm)</label><input id="a" type="number" min=".1" max="5000" step=".1" value="30"></div><div><label for="b">Limite 2 (mm)</label><input id="b" type="number" min=".1" max="5000" step=".1" value="50"></div></div>
-<p class="muted">Alterar parâmetros reinicia as observações.</p><button type="submit" class="primary small">Aplicar e reiniciar</button></form><div class="pair actions"><button id="clear" class="small">Limpar dados</button><button id="toggle" class="small">Encerrar sala</button></div></section>
-</aside>
-<div class="maincol"><div class="stats">
-<div><div class="label">EXPERIMENTOS RECEBIDOS</div><strong id="count">0</strong><p id="people" class="muted">Aguardando participantes</p></div>
-<div><div class="label">MÉDIA OBSERVADA</div><strong id="mean">—</strong><p id="expected" class="muted">Esperado: 12 mm</p></div>
-<div><div class="label">FREQUÊNCIA ACIMA DE <span class="ta">30</span> MM</div><strong id="tail">—</strong><p id="tail-theory" class="muted">Teoria: 9,43%</p></div></div>
-<section class="panel"><div class="chartheader"><div><div class="label">DADOS DA TURMA · ATUALIZAÇÃO AO VIVO</div><h2 id="chart-title">Volume em dia chuvoso</h2></div><div class="legend"><span><i class="bar"></i>Amostra</span><span><i class="line"></i>Gama teórica</span></div></div>
-<svg id="chart" viewBox="0 0 920 390" role="img" aria-label="Histograma das simulações e curva teórica da distribuição gama; dados também disponíveis em tabela textual"></svg>
-<p id="chart-description" class="note" aria-live="polite">Aguardando os primeiros resultados.</p>
-<details><summary>Ver tabela acessível do histograma</summary><div class="tablewrap"><table><caption>Frequências por faixa de precipitação</caption><thead><tr><th>Faixa (mm)</th><th>Quantidade</th><th>Percentual</th></tr></thead><tbody id="hist-table"></tbody></table></div></details></section>
-<div class="duo"><section class="panel"><div class="label">INTERPRETAÇÃO</div><h2 id="interpret-title">Por que a curva é assimétrica?</h2><p id="interpret">A gama modela valores positivos. Eventos extremos são raros e formam a cauda direita da distribuição.</p></section>
-<section class="panel"><div class="label">FREQUÊNCIA ACIMA DE <span class="tb">50</span> MM</div><div class="metric" id="tail-b">—</div><p id="tail-b-theory" class="muted">Teoria: 2,30%</p></section></div>
-<div id="demo-actions" hidden><button id="gen10">Gerar 10 testes</button> <button id="gen50" class="primary">Gerar 50 testes</button></div>
-</div></div>
-</section>
-<section id="student" class="screen wrap studentwrap" hidden>
-<div class="hero"><p class="tag">EXPERIMENTO EM ANDAMENTO</p><h1>Faça <em>chover.</em></h1><p id="student-context">Cada clique sorteia um novo volume positivo de precipitação.</p></div>
-<section class="panel"><p>Código: <strong id="student-code">--------</strong> · <span id="student-state">Sala aberta</span></p><div class="last"><div aria-hidden="true" class="cloud">☁</div><div><div class="label">ÚLTIMA SIMULAÇÃO</div><strong id="last">—</strong><p id="last-label" class="muted">Escolha a quantidade de experimentos abaixo.</p></div></div>
-<h2>Quantos experimentos quer gerar?</h2><div class="choices"><button data-n="1"><strong>1</strong><span>experimento</span></button><button data-n="10"><strong>10</strong><span>experimentos</span></button><button data-n="50"><strong>50</strong><span>experimentos</span></button></div>
-<p id="feedback" role="status" aria-live="polite" class="note">Os sorteios serão enviados ao gráfico da sala.</p>
-<div class="stats two"><div><div class="label">VOCÊ CONTRIBUIU</div><strong id="mine">0</strong></div><div><div class="label">TODA A TURMA</div><strong id="class-total">0</strong></div></div>
-<details><summary>Como os números são sorteados?</summary><p id="student-explain">Os valores seguem uma distribuição gama, com parâmetros escolhidos pelo apresentador.</p></details>
-<button id="back-student" class="linkbtn">Sair da sala</button></section></section>
-</main><div id="toast" class="toast" role="status" aria-live="polite" hidden></div></body></html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#081929" />
+  <meta name="description" content="Experimento coletivo e acessível de distribuição gama: alunos simulam chuvas e o gráfico da turma evolui ao vivo." />
+  <title>GamaLab | Laboratório coletivo de chuva</title>
+  <link rel="stylesheet" href="styles.css" />
+  <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script defer src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <script defer src="config.js"></script>
+  <script defer src="app.js"></script>
+</head>
+<body>
+  <a class="skip" href="#conteudo">Ir direto para o conteúdo</a>
+  <header class="topbar">
+    <a class="brand" href="./" aria-label="GamaLab, início"><span class="brand-icon" aria-hidden="true">◈</span><span>Gama<span class="brand-accent">Lab</span></span></a>
+    <span class="top-caption">LABORATÓRIO DE PROBABILIDADE <span class="dot">•</span> DISTRIBUIÇÃO GAMA</span>
+    <span id="top-status" class="connection-tag" aria-live="polite">Pronto para começar</span>
+  </header>
+
+  <main id="conteudo">
+    <section id="landing" class="page-wrap screen">
+      <div class="hero">
+        <div class="eyebrow"><span class="live-dot"></span> EXPERIMENTO COLETIVO · SEM INSTALAÇÃO</div>
+        <h1>Milhares de gotas.<br /><span class="gradient">Uma distribuição.</span></h1>
+        <p class="hero-text">Descubra como volumes de chuva simulados pelos celulares da turma formam uma distribuição gama — ao vivo, no projetor.</p>
+      </div>
+      <div class="landing-grid">
+        <section class="panel option-panel">
+          <span class="option-icon" aria-hidden="true">▦</span>
+          <div class="micro">NO COMPUTADOR DO APRESENTADOR</div>
+          <h2>Projetar o experimento</h2>
+          <p>Abra o painel no seu computador e projete o QR code. Os alunos enviam simulações automaticamente, sem aprovação.</p>
+          <form id="create-form" class="stack-form">
+            <label for="host-pin">Senha privada do painel (só neste computador)</label>
+            <input id="host-pin" type="password" autocomplete="off" placeholder="Definida no Supabase" required />
+            <button class="btn btn-primary" type="submit">Criar sala <span aria-hidden="true">→</span></button>
+          </form>
+        </section>
+        <section class="panel option-panel">
+          <span class="option-icon" aria-hidden="true">↗</span>
+          <div class="micro">PARA OS ALUNOS</div>
+          <h2>Entrar no experimento</h2>
+          <p>Escaneie o QR code ou digite o código da sala para participar pelo celular.</p>
+          <form id="join-form" class="stack-form">
+            <label for="room-code">Código da sala</label>
+            <input id="room-code" maxlength="8" minlength="8" pattern="[A-Fa-f0-9]{8}" inputmode="text" autocomplete="off" placeholder="Ex.: A13F0C8D" required />
+            <button class="btn btn-outline" type="submit">Entrar na sala <span aria-hidden="true">→</span></button>
+          </form>
+        </section>
+      </div>
+      <div id="setup-warning" class="setup-warning" hidden>
+        <strong>Modo demonstração disponível.</strong> Configure o Supabase para que os celulares compartilhem dados de verdade. Até lá, você pode testar o painel localmente.
+      </div>
+      <div class="landing-footer">
+        <button class="text-link" id="demo-start" type="button">Explorar demonstração sem servidor <span aria-hidden="true">↗</span></button>
+        <span>Sem login · Não solicitamos nomes ou e-mails</span>
+      </div>
+    </section>
+
+    <section id="host-screen" class="screen page-wrap" hidden>
+      <div class="page-heading">
+        <div>
+          <div class="micro">PAINEL DO APRESENTADOR <span id="host-demo-tag" class="mini-tag" hidden>DEMONSTRAÇÃO LOCAL</span></div>
+          <h1>Chuva em <span class="gradient">tempo real.</span></h1>
+          <p class="subhead">Acompanhe como a amostra da sala se aproxima da distribuição teórica.</p>
+        </div>
+        <div class="session-control">
+          <span id="session-state" class="pill pill-open">Sala aberta</span>
+          <button id="leave-host" class="btn btn-small btn-outline" type="button">Voltar</button>
+        </div>
+      </div>
+      <div class="host-layout">
+        <aside class="host-sidebar">
+          <section class="panel invite-card">
+            <div class="micro">PARTICIPE PELO CELULAR</div>
+            <h2>Entre no experimento</h2>
+            <div id="qr-code" class="qr-block" role="img" aria-label="QR code do link de participação; link alternativo abaixo"></div>
+            <div class="micro center">CÓDIGO DA SALA</div>
+            <div id="display-code" class="room-code">--------</div>
+            <a id="join-link" class="share-url" href="#" target="_blank" rel="noopener noreferrer">O link aparecerá aqui</a>
+            <div class="stack-form">
+              <button class="btn btn-outline btn-small" type="button" id="copy-link">Copiar link para alunos</button>
+              <div id="link-help" class="helper" role="status"></div>
+            </div>
+          </section>
+          <section class="panel config-card">
+            <div class="section-header"><h2>Configuração</h2><span class="micro">SOMENTE APRESENTADOR</span></div>
+            <form id="settings-form" class="stack-form">
+              <label for="cfg-mode">Experimento</label>
+              <select id="cfg-mode">
+                <option value="dia">Chuva em um dia chuvoso (Gama)</option>
+                <option value="mes">Janeiro completo (modelo misto)</option>
+              </select>
+              <div class="field-row">
+                <div><label for="cfg-alpha">Forma (α)</label><input type="number" id="cfg-alpha" min="0.2" max="8" step="0.1" value="0.8" required /></div>
+                <div><label for="cfg-theta">Escala (θ), mm</label><input type="number" id="cfg-theta" min="0.5" max="100" step="0.5" value="15" required /></div>
+              </div>
+              <div id="dry-field"><label for="cfg-dry">Chance de dia seco (%)</label><input type="number" id="cfg-dry" min="0" max="95" step="1" value="45" /></div>
+              <div class="field-row">
+                <div><label for="cfg-a">Limite 1 (mm)</label><input type="number" id="cfg-a" min="0.1" max="5000" step="0.1" value="30" required /></div>
+                <div><label for="cfg-b">Limite 2 (mm)</label><input type="number" id="cfg-b" min="0.1" max="5000" step="0.1" value="50" required /></div>
+              </div>
+              <p class="helper">Alterar a configuração reinicia as observações, para não misturar distribuições diferentes.</p>
+              <button class="btn btn-primary btn-small" id="apply-settings" type="submit">Aplicar e reiniciar gráfico</button>
+            </form>
+            <div class="subtle-rule"></div>
+            <div class="field-row">
+              <button class="btn btn-small btn-outline" id="clear-room" type="button">Limpar dados</button>
+              <button class="btn btn-small btn-danger" id="toggle-room" type="button">Encerrar sala</button>
+            </div>
+          </section>
+        </aside>
+        <section class="dashboard">
+          <section class="stats-grid" aria-label="Estatísticas do experimento">
+            <div class="stat-card"><div class="micro">EXPERIMENTOS RECEBIDOS</div><strong id="stat-count">0</strong><span id="stat-contributors">Aguardando participantes</span></div>
+            <div class="stat-card"><div class="micro">MÉDIA OBSERVADA</div><strong id="stat-mean">—</strong><span id="stat-theory-mean">Esperado: 12,0 mm</span></div>
+            <div class="stat-card"><div class="micro">CHANCE OBSERVADA ACIMA DE <span class="stat-threshold">30</span> MM</div><strong id="stat-tail">—</strong><span id="stat-theory-tail">Teoria: 9,43%</span></div>
+          </section>
+          <section class="panel chart-panel">
+            <div class="chart-header">
+              <div><div class="micro">DADOS DA TURMA · ATUALIZAÇÃO AO VIVO</div><h2 id="chart-title">Distribuição dos volumes de chuva</h2></div>
+              <div class="chart-legend"><span><i class="swatch swatch-bars"></i> Simulação</span><span id="theory-legend"><i class="swatch swatch-line"></i> Gama teórica</span></div>
+            </div>
+            <div class="chart-frame"><svg id="main-chart" viewBox="0 0 900 360" role="img" aria-label="Histograma das simulações e curva teórica; há uma descrição textual das estatísticas logo abaixo."></svg></div>
+            <div id="chart-note" class="chart-note" role="status" aria-live="polite" aria-atomic="true">Aguardando as primeiras simulações. A curva é a previsão matemática para o modelo escolhido.</div>
+            <details class="accessible-data"><summary>Ver tabela acessível do histograma</summary><div class="table-scroll"><table><caption>Frequências por intervalo de precipitação</caption><thead><tr><th scope="col">Intervalo (mm)</th><th scope="col">Observações</th><th scope="col">Percentual</th></tr></thead><tbody id="histogram-rows"></tbody></table></div></details>
+          </section>
+          <div class="dashboard-bottom">
+            <section class="panel explain-card">
+              <div class="micro">O QUE ESTAMOS OBSERVANDO</div>
+              <h2 id="explain-title">Por que a curva é assimétrica?</h2>
+              <p id="model-explanation">No modelo escolhido, volumes pequenos ou moderados são mais frequentes do que volumes extremos. A curva gama descreve a probabilidade de quantidades positivas de chuva.</p>
+            </section>
+            <section class="panel second-stat">
+              <div class="micro">CHANCE DE SUPERAR <span class="stat-threshold-b">50</span> MM</div>
+              <strong id="stat-tail-b">—</strong>
+              <div id="stat-theory-tail-b" class="helper">Teoria: 2,30%</div>
+            </section>
+          </div>
+          <div class="host-actions"><button id="simulate-demo-1" class="btn btn-outline" type="button" hidden>Gerar 10 resultados de teste</button><button id="simulate-demo-50" class="btn btn-primary" type="button" hidden>Gerar 50 resultados de teste</button></div>
+        </section>
+      </div>
+    </section>
+
+    <section id="student-screen" class="screen page-wrap student-wrap" hidden>
+      <div class="student-heading"><span class="eyebrow"><span class="live-dot"></span> EXPERIMENTO EM ANDAMENTO</span><h1>Faça <span class="gradient">chover.</span></h1><p id="student-context">Cada clique gera novos resultados e os adiciona automaticamente ao gráfico projetado.</p></div>
+      <div class="panel student-main">
+        <div class="student-room-line"><span>Código: <strong id="student-code">--------</strong></span><span id="student-status" class="pill pill-open">Recebendo dados</span></div>
+        <div class="student-weather"><span aria-hidden="true">☁</span><div><div class="micro">SUA ÚLTIMA SIMULAÇÃO</div><strong id="student-last">—</strong><div id="student-last-label" class="helper">Toque em um botão para começar.</div></div></div>
+        <h2>Quantos experimentos deseja gerar?</h2>
+        <div class="student-buttons">
+          <button class="simulation-button" type="button" data-n="1"><strong>1</strong><span>experimento</span></button>
+          <button class="simulation-button" type="button" data-n="10"><strong>10</strong><span>experimentos</span></button>
+          <button class="simulation-button popular" type="button" data-n="50"><strong>50</strong><span>experimentos</span></button>
+        </div>
+        <p id="student-feedback" class="feedback" role="status" aria-live="polite">Sem aprovação: seus resultados entram automaticamente no gráfico projetado.</p>
+        <div class="student-totals"><div><div class="micro">VOCÊ CONTRIBUIU</div><strong id="my-count">0</strong><span>resultados nesta rodada</span></div><div><div class="micro">TODA A TURMA</div><strong id="class-count">0</strong><span>resultados coletivos</span></div></div>
+        <details class="student-about"><summary>Entenda como os números são sorteados</summary><p id="student-model-help">Os volumes são sorteados segundo uma distribuição gama com parâmetros escolhidos na tela de projeção. A média teórica é alfa vezes teta.</p></details>
+        <button id="leave-student" class="text-link" type="button">Sair da sala</button>
+      </div>
+    </section>
+  </main>
+  <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+</body>
+</html>
