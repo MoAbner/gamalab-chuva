@@ -1,39 +1,567 @@
-(()=>{
-const $=id=>document.getElementById(id),fmt=(x,n=1)=>Number(x).toLocaleString('pt-BR',{maximumFractionDigits:n,minimumFractionDigits:n}),pct=x=>isFinite(x)?fmt(x*100,2)+'%':'—';
-let db=null,room=null,code='',token='',demo=false,host=false,values=[],people=new Set(),mine=0,epoch=null,timer=null,busy=false;
-let pid;try{pid=localStorage.getItem('gamalab-pid')||crypto.randomUUID();localStorage.setItem('gamalab-pid',pid)}catch{pid=crypto.randomUUID()}
-function tell(t){$('toast').textContent=t;$('toast').hidden=false;setTimeout(()=>$('toast').hidden=true,5000)}
-function show(k){['home','host','student'].forEach(x=>$(x).hidden=x!==k)}
-const def=()=>({modo:'dia',alpha:.8,theta:15,seca:.45,limit_a:30,limit_b:50,status:'aberta',epoch:1});
-const r=()=>room||def(),url=()=>new URL('./?sala='+code,location.href).href;
-function gamma(a,t){if(a<1)return gamma(a+1,t)*Math.pow(Math.max(Math.random(),1e-12),1/a);let d=a-1/3,c=1/Math.sqrt(9*d);for(;;){let x=Math.sqrt(-2*Math.log(Math.max(Math.random(),1e-12)))*Math.cos(2*Math.PI*Math.random()),v=1+c*x;if(v<=0)continue;v=v*v*v;let u=Math.random();if(u<1-.0331*x*x*x*x||Math.log(u)<x*x/2+d*(1-v+Math.log(v)))return t*d*v}}
-function sample(n){let a=[];for(let i=0;i<n;i++){let x=0;if(r().modo==='dia')x=gamma(r().alpha,r().theta);else for(let d=0;d<31;d++)if(Math.random()>=r().seca)x+=gamma(r().alpha,r().theta);a.push(x)}return a}
-function loggamma(z){const p=[.9999999999998099,676.5203681218851,-1259.1392167224028,771.3234287776531,-176.6150291621406,12.507343278686905,-.13857109526572012,9.984369578019572e-6,1.5056327351493116e-7];if(z<.5)return Math.log(Math.PI)-Math.log(Math.sin(Math.PI*z))-loggamma(1-z);z--;let x=p[0];for(let i=1;i<p.length;i++)x+=p[i]/(z+i);let t=z+7.5;return .5*Math.log(2*Math.PI)+(z+.5)*Math.log(t)-t+Math.log(x)}
-function cdf(x,a,t){if(x<=0)return 0;let z=x/t;if(z<a+1){let s=1/a,d=s,b=a;for(let i=0;i<300;i++){d*=z/++b;s+=d;if(Math.abs(d)<Math.abs(s)*1e-12)break}return Math.max(0,Math.min(1,s*Math.exp(-z+a*Math.log(z)-loggamma(a))))}let b=z+1-a,c=1e30,d=1/Math.max(b,1e-30),h=d;for(let i=1;i<300;i++){let k=-i*(i-a);b+=2;d=k*d+b;if(Math.abs(d)<1e-30)d=1e-30;c=b+k/c;if(Math.abs(c)<1e-30)c=1e-30;d=1/d;let q=d*c;h*=q;if(Math.abs(q-1)<1e-12)break}return Math.max(0,Math.min(1,1-Math.exp(-z+a*Math.log(z)-loggamma(a))*h))}
-async function rpc(n,args){if(!db)throw Error('Configure o Supabase antes de criar salas.');const v=await db.rpc(n,args);if(v.error)throw Error(v.error.message);return v.data}
-async function fetchRoom(){const v=await db.from('gama_rooms').select('*').eq('code',code).maybeSingle();if(v.error||!v.data)throw Error(v.error?.message||'Sala não encontrada.');if(epoch!==null&&epoch!==v.data.epoch){values=[];mine=0}room=v.data;epoch=room.epoch;sync()}
-async function fetchData(){let all=[];for(let i=0;i<40000;i+=1000){const v=await db.from('gama_batches').select('id,participant_id,amostras').eq('room_id',room.id).eq('epoch',epoch).order('id').range(i,i+999);if(v.error)throw Error(v.error.message);all.push(...v.data);if(v.data.length<1000)break}values=all.flatMap(x=>x.amostras||[]);people=new Set(all.map(x=>x.participant_id));mine=all.filter(x=>x.participant_id===pid).reduce((s,x)=>s+x.amostras.length,0);draw()}
-async function refresh(){if(demo||!db||busy)return;try{await fetchRoom();await fetchData();$('connection').textContent='Sala sincronizada'}catch(e){$('connection').textContent='Reconectando…';console.warn(e)}}
-function polling(){clearInterval(timer);timer=setInterval(refresh,3000)}
-function qr(){const q=$('qr');q.textContent='';$('host-code').textContent=code;$('invite').textContent=url();$('invite').href=url();if(window.QRCode)new QRCode(q,{text:url(),width:176,height:176});else q.textContent='Use o link de participação abaixo.'}
-function sync(){let a=r();$('mode').value=a.modo;$('alpha').value=a.alpha;$('theta').value=a.theta;$('dry').value=Math.round(a.seca*100);$('a').value=a.limit_a;$('b').value=a.limit_b;$('dry-wrap').hidden=a.modo==='dia';$('student-code').textContent=code;$('room-status').textContent=a.status==='aberta'?'Sala aberta':'Sala encerrada';$('student-state').textContent=$('room-status').textContent;$('toggle').textContent=a.status==='aberta'?'Encerrar sala':'Reabrir sala';$('student-context').textContent=a.modo==='dia'?'Cada resultado é um volume positivo de chuva em um dia chuvoso.':'Cada resultado soma a chuva de 31 dias, incluindo dias secos.';let info=a.modo==='dia'?'A distribuição gama modela chuva positiva em dias chuvosos. Média teórica: alfa vezes teta.':'Janeiro completo: cada dia pode ser seco; quando chove, o volume segue gama. O total mensal não é uma distribuição gama simples.';$('interpret').textContent=info;$('student-explain').textContent=info;$('chart-title').textContent=a.modo==='dia'?'Volume em dias chuvosos':'Chuva acumulada no mês';document.querySelectorAll('.ta').forEach(e=>e.textContent=fmt(a.limit_a,0));document.querySelectorAll('.tb').forEach(e=>e.textContent=fmt(a.limit_b,0));document.querySelector('.legend .line').parentElement.hidden=a.modo!=='dia';document.querySelectorAll('.choices button').forEach(b=>b.disabled=busy||a.status!=='aberta')}
-function draw(){let a=r(),n=values.length,mean=n?values.reduce((s,x)=>s+x,0)/n:NaN,expected=a.modo==='dia'?a.alpha*a.theta:31*(1-a.seca)*a.alpha*a.theta,tail=x=>n?values.filter(v=>v>x).length/n:NaN;$('count').textContent=n;$('people').textContent=demo?'Demonstração local':people.size+' participantes';$('mean').textContent=n?fmt(mean,2)+' mm':'—';$('expected').textContent='Esperado: '+fmt(expected,2)+' mm';$('tail').textContent=pct(tail(a.limit_a));$('tail-b').textContent=pct(tail(a.limit_b));$('tail-theory').textContent=a.modo==='dia'?'Teoria: '+pct(1-cdf(a.limit_a,a.alpha,a.theta)):'Modelo mensal misto';$('tail-b-theory').textContent=a.modo==='dia'?'Teoria: '+pct(1-cdf(a.limit_b,a.alpha,a.theta)):'Modelo mensal misto';$('mine').textContent=mine;$('class-total').textContent=n;
-let width=900,height=370,lo=55,top=20,plotWidth=width-75,plotHeight=295,sd=Math.sqrt(a.modo==='dia'?a.alpha*a.theta*a.theta:31*(1-a.seca)*a.alpha*a.theta*a.theta+31*(1-a.seca)*a.seca*Math.pow(a.alpha*a.theta,2)),max=Math.max(10,expected+3.5*sd,n?Math.max(...values)*1.02:0),bins=25,step=max/bins,count=Array(bins).fill(0);values.forEach(x=>count[Math.min(bins-1,Math.floor(x/step))]++);let heights=count.map(x=>n?x/n/step:0),theory=a.modo==='dia'?count.map((_,i)=>(cdf((i+1)*step,a.alpha,a.theta)-cdf(i*step,a.alpha,a.theta))/step):[],peak=Math.max(.0001,...heights,...theory)*1.2,X=x=>lo+x/max*plotWidth,Y=y=>top+plotHeight-y/peak*plotHeight,parts=[];for(let i=0;i<=4;i++){let y=top+i*plotHeight/4;parts.push('<line x1="'+lo+'" y1="'+y+'" x2="880" y2="'+y+'" stroke="#2b4c64" stroke-dasharray="4 5"/>')}for(let i=0;i<=5;i++)parts.push('<text x="'+X(max*i/5)+'" y="340" fill="#b9d3e0" font-size="13" text-anchor="middle">'+fmt(max*i/5,0)+'</text>');parts.push('<text x="450" y="363" fill="#b9d3e0" font-size="13" text-anchor="middle">Volume de chuva (mm)</text>');heights.forEach((v,i)=>parts.push('<rect x="'+(X(i*step)+1)+'" y="'+Y(v)+'" width="'+(plotWidth/bins-2)+'" height="'+(top+plotHeight-Y(v))+'" fill="#2eb8dc"><title>'+count[i]+' valores entre '+fmt(i*step)+' e '+fmt((i+1)*step)+' mm</title></rect>'));if(theory.length){let d=theory.map((v,i)=>(i?'L':'M')+X((i+.5)*step)+','+Y(v)).join(' ');parts.push('<path d="'+d+'" fill="none" stroke="#61f0b4" stroke-width="3"/>')}$('chart').innerHTML=parts.join('');let tbl=$('hist-table');tbl.replaceChildren();count.forEach((k,i)=>{let row=document.createElement('tr');[fmt(i*step)+' a '+fmt((i+1)*step),k,pct(n?k/n:0)].forEach(v=>{let c=document.createElement('td');c.textContent=v;row.append(c)});tbl.append(row)});$('chart-description').textContent=n?n+' resultados; média observada '+fmt(mean,2)+' mm; '+pct(tail(a.limit_a))+' superaram '+fmt(a.limit_a)+' mm.':'Aguardando os primeiros resultados da turma.'}
-async function submit(n){if(busy)return;busy=true;sync();try{let v;if(demo){v=sample(n);values.push(...v);mine+=n;people.add(pid);draw()}else{const d=await rpc('gama_submit',{p_code:code,p_participant_id:pid,p_request_id:crypto.randomUUID(),p_count:n});v=d.amostras;await fetchRoom();await fetchData()}$('last').textContent=fmt(v[v.length-1],2)+' mm';$('last-label').textContent='Último resultado sorteado';$('feedback').textContent=n+' simulações adicionadas com sucesso.'}catch(e){$('feedback').textContent=e.message;tell(e.message)}finally{busy=false;sync()}}
-async function control(action){try{if(demo){if(action==='limpar'){values=[];mine=0}else room.status=action==='encerrar'?'encerrada':'aberta';sync();draw()}else{await rpc('gama_room_action',{p_code:code,p_host_token:token,p_action:action});await fetchRoom();await fetchData()}}catch(e){tell(e.message)}}
-$('create-form').onsubmit=async e=>{e.preventDefault();try{const x=await rpc('gama_create_room',{p_host_pin:$('pin').value});code=x.code;token=x.token;demo=false;host=true;epoch=null;values=[];await fetchRoom();qr();draw();show('host');polling()}catch(err){tell(err.message)}};
-async function join(c){if(!db)throw Error('O Supabase ainda não está configurado.');code=c;demo=false;host=false;epoch=null;values=[];await fetchRoom();await fetchData();show('student');polling()}
-$('join-form').onsubmit=async e=>{e.preventDefault();try{await join($('join-code').value.toUpperCase())}catch(err){tell(err.message)}};
-$('demo').onclick=()=>{demo=true;host=true;code='DEMO1234';room=def();values=[];mine=0;people=new Set();epoch=1;$('demo-tag').hidden=false;$('demo-actions').hidden=false;sync();qr();draw();show('host');tell('Demonstração local: não recebe simulações dos alunos.')};
-$('mode').onchange=()=>{$('dry-wrap').hidden=$('mode').value==='dia'};
-$('settings').onsubmit=async e=>{e.preventDefault();let x={modo:$('mode').value,alpha:+$('alpha').value,theta:+$('theta').value,seca:+$('dry').value/100,limit_a:+$('a').value,limit_b:+$('b').value};if(x.alpha<.2||x.alpha>8||x.theta<.5||x.theta>100||x.seca<0||x.seca>.95||x.limit_a<=0||x.limit_b<=x.limit_a){tell('Parâmetros inválidos.');return}try{if(demo){Object.assign(room,x);values=[];mine=0;sync();draw()}else{await rpc('gama_update_room',{p_code:code,p_host_token:token,p_modo:x.modo,p_alpha:x.alpha,p_theta:x.theta,p_seca:x.seca,p_limit_a:x.limit_a,p_limit_b:x.limit_b});await fetchRoom();await fetchData()}tell('Parâmetros aplicados.')}catch(err){tell(err.message)}};
-$('clear').onclick=()=>{if(confirm('Limpar todos os resultados desta rodada?'))control('limpar')};
-$('toggle').onclick=()=>control(r().status==='aberta'?'encerrar':'reabrir');
-document.querySelectorAll('.choices button').forEach(b=>b.onclick=()=>submit(+b.dataset.n));
-$('gen10').onclick=()=>{values.push(...sample(10));draw()};$('gen50').onclick=()=>{values.push(...sample(50));draw()};
-$('copy').onclick=()=>navigator.clipboard.writeText(url()).then(()=>tell('Link copiado.')).catch(()=>tell('Copie o link mostrado no painel.'));
-function back(){clearInterval(timer);history.replaceState({},'',location.pathname);show('home')}
-$('back-host').onclick=back;$('back-student').onclick=back;
-if(window.GAMA_CONFIG?.supabaseUrl&&window.GAMA_CONFIG?.supabaseKey&&window.supabase){db=window.supabase.createClient(window.GAMA_CONFIG.supabaseUrl,window.GAMA_CONFIG.supabaseKey);$('connection').textContent='Supabase conectado'}else{$('setup-note').hidden=false;$('connection').textContent='Modo demonstração'}
-const q=new URLSearchParams(location.search).get('sala');if(q&&/^[a-f0-9]{8}$/i.test(q))join(q.toUpperCase()).catch(e=>tell(e.message));
+/* GamaLab · Aula interativa de distribuição gama e chuva.
+ * Site estático (GitHub Pages); sincronização opcional via Supabase.
+ * Não coleta nomes, e-mails ou localização. Não coloque chaves privadas aqui.
+ */
+(() => {
+  'use strict';
+  const $ = id => document.getElementById(id);
+  const fmt = (number, digits = 1) => Number(number).toLocaleString('pt-BR', { minimumFractionDigits: digits, maximumFractionDigits: digits });
+  const pc = number => `${fmt(100 * number, 2)}%`;
+  const config = window.GAMA_CONFIG || {};
+  const isConfigured = Boolean(config.supabaseUrl && config.supabaseKey &&
+    /^https:\/\/[\w.-]+\.supabase\.co\/?$/.test(config.supabaseUrl) &&
+    !config.supabaseKey.includes('COLE_'));
+  const supabaseClient = isConfigured && window.supabase?.createClient
+    ? window.supabase.createClient(config.supabaseUrl, config.supabaseKey, {
+        auth: { persistSession: false, autoRefreshToken: false },
+        realtime: { params: { eventsPerSecond: 5 } }
+      }) : null;
+  const MAX_PER_DEVICE = 400;
+  const state = { role: null, room: null, hostToken: null, participantId: null,
+    demo: false, batches: [], channel: null, pollTimer: null, refreshTimer: null,
+    loadingBatches: false, loadAgain: false, demoCounter: 0, busy: false, myCount: 0 };
+
+  // --- Estatística: Gama, função gama incompleta e experimentos locais ---
+  function logGamma(z) {
+    const p = [0.99999999999980993, 676.5203681218851, -1259.1392167224028,
+      771.32342877765313, -176.6150291621406, 12.507343278686905,
+      -0.13857109526572012, 9.9843695780195716e-6, 1.5056327351493116e-7];
+    if (z < 0.5) return Math.log(Math.PI) - Math.log(Math.sin(Math.PI * z)) - logGamma(1 - z);
+    z -= 1;
+    let x = p[0];
+    for (let i = 1; i < p.length; i++) x += p[i] / (z + i);
+    const t = z + 7.5;
+    return 0.5 * Math.log(2 * Math.PI) + (z + 0.5) * Math.log(t) - t + Math.log(x);
+  }
+  function gammaP(a, x) {
+    if (x <= 0) return 0;
+    if (x < a + 1) {
+      let sum = 1 / a, d = sum;
+      for (let n = 1; n <= 300; n++) {
+        d *= x / (a + n); sum += d;
+        if (Math.abs(d) < Math.abs(sum) * 1e-14) break;
+      }
+      return Math.max(0, Math.min(1, sum * Math.exp(-x + a * Math.log(x) - logGamma(a))));
+    }
+    let b = x + 1 - a, c = 1e30, d = 1 / Math.max(b, 1e-30), h = d;
+    for (let i = 1; i <= 300; i++) {
+      const an = -i * (i - a);
+      b += 2;
+      d = an * d + b; if (Math.abs(d) < 1e-30) d = 1e-30;
+      c = b + an / c; if (Math.abs(c) < 1e-30) c = 1e-30;
+      d = 1 / d;
+      const delta = d * c;
+      h *= delta;
+      if (Math.abs(delta - 1) < 1e-14) break;
+    }
+    const q = h * Math.exp(-x + a * Math.log(x) - logGamma(a));
+    return Math.max(0, Math.min(1, 1 - q));
+  }
+  function gammaCDF(x, alpha, theta) { return gammaP(alpha, x / theta); }
+  function gammaTail(x, alpha, theta) { return 1 - gammaCDF(x, alpha, theta); }
+  function gammaQuantile(q, alpha, theta) {
+    let hi = Math.max(theta * alpha, theta);
+    while (gammaCDF(hi, alpha, theta) < q && hi < 1e9) hi *= 2;
+    let lo = 0;
+    for (let i = 0; i < 75; i++) {
+      const mid = (lo + hi) / 2;
+      if (gammaCDF(mid, alpha, theta) < q) lo = mid; else hi = mid;
+    }
+    return (lo + hi) / 2;
+  }
+  function gammaSample(alpha, theta, rng = Math.random) {
+    if (alpha < 1) return gammaSample(alpha + 1, theta, rng) * Math.pow(Math.max(rng(), 1e-15), 1 / alpha);
+    const d = alpha - 1 / 3, c = 1 / Math.sqrt(9 * d);
+    while (true) {
+      const x = Math.sqrt(-2 * Math.log(Math.max(rng(), 1e-15))) * Math.cos(2 * Math.PI * rng());
+      const v0 = 1 + c * x;
+      if (v0 <= 0) continue;
+      const v = v0 * v0 * v0, u = Math.max(rng(), 1e-15);
+      if (u < 1 - 0.0331 * x ** 4 || Math.log(u) < 0.5 * x * x + d * (1 - v + Math.log(v))) return theta * d * v;
+    }
+  }
+  function simulateLocal(room, n) {
+    const list = [];
+    for (let i = 0; i < n; i++) {
+      if (room.modo === 'dia') list.push(gammaSample(room.alpha, room.theta));
+      else {
+        let total = 0;
+        for (let day = 0; day < 31; day++) if (Math.random() >= room.seca) total += gammaSample(room.alpha, room.theta);
+        list.push(total);
+      }
+    }
+    return list;
+  }
+  window.GamaMath = { logGamma, gammaP, gammaCDF, gammaTail, gammaQuantile, gammaSample, simulateLocal };
+
+  function defaultRoom() {
+    return { id: 'demo', code: 'DEMO', status: 'aberta', modo: 'dia', alpha: 0.8,
+      theta: 15, seca: 0.45, limit_a: 30, limit_b: 50, total_samples: 0, epoch: 1,
+      expires_at: new Date(Date.now() + 24 * 3600 * 1000).toISOString() };
+  }
+  function save(key, value) { try { localStorage.setItem(key, value); } catch (_) {} }
+  function restore(key) { try { return localStorage.getItem(key); } catch (_) { return null; } }
+  function uid() {
+    if (globalThis.crypto?.randomUUID) return globalThis.crypto.randomUUID();
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+      const r = Math.floor(Math.random() * 16); return (c === 'x' ? r : (r & 3 | 8)).toString(16);
+    });
+  }
+  function baseUrl() { return location.href.split('?')[0].split('#')[0]; }
+  function joinUrl(code) { return `${baseUrl()}?s=${encodeURIComponent(code)}`; }
+  let toastTimer;
+  function toast(text) {
+    const el = $('toast'); el.textContent = text; el.hidden = false;
+    clearTimeout(toastTimer); toastTimer = setTimeout(() => { el.hidden = true; }, 6500);
+  }
+  function showScreen(name) {
+    ['landing', 'host-screen', 'student-screen'].forEach(id => { $(id).hidden = id !== name; });
+    window.scrollTo({ top: 0, behavior: 'instant' });
+  }
+  function setTop(text) { $('top-status').textContent = text; }
+  function updateURL(param) {
+    try { history.replaceState(null, '', param ? `${baseUrl()}?${param}` : baseUrl()); } catch (_) {}
+  }
+  function setBusy(flag) {
+    state.busy = flag;
+    document.querySelectorAll('.simulation-button').forEach(button => button.disabled = flag || state.room?.status !== 'aberta');
+  }
+  function available(room) {
+    return Boolean(room && room.status === 'aberta' && new Date(room.expires_at).getTime() > Date.now());
+  }
+  function checkError(error) {
+    const message = error?.message || 'Falha na comunicação com o servidor.';
+    return message.replace(/^.*?ERROR:\s*/i, '').slice(0, 220);
+  }
+
+  // --- Acesso às salas e eventos Realtime ---
+  async function fetchRoom(code) {
+    if (!supabaseClient) throw Error('Configure o Supabase em config.js para usar uma sala online.');
+    const { data, error } = await supabaseClient.from('gama_rooms').select('*')
+      .eq('code', code.toUpperCase()).maybeSingle();
+    if (error) throw error;
+    if (!data) throw Error('Código não encontrado. Verifique os oito caracteres.');
+    return data;
+  }
+  async function enterHost(room, token, demo = false) {
+    disconnect();
+    Object.assign(state, { room, hostToken: token, role: 'host', demo, batches: [], myCount: 0 });
+    showScreen('host-screen');
+    $('host-demo-tag').hidden = !demo;
+    $('simulate-demo-1').hidden = !demo;
+    $('simulate-demo-50').hidden = !demo;
+    $('copy-link').disabled = demo;
+    $('qr-code').textContent = '';
+    $('qr-code').setAttribute('aria-label', demo ? 'QR code indisponível no modo local' : 'QR code para entrar na sala');
+    if (demo) {
+      $('qr-code').textContent = 'Prévia local\nSem compartilhamento';
+      updateURL('demo=1');
+      setTop('Demonstração local');
+    } else {
+      updateURL(`painel=${room.code}`);
+      renderQR(joinUrl(room.code));
+      setTop('Sala conectada');
+      connectRealtime();
+      await refreshBatchData();
+    }
+    updateRoomUI();
+  }
+  async function enterStudent(room) {
+    disconnect();
+    const key = `gama_student_${room.code}`;
+    let participantId = restore(key);
+    if (!/^[a-f0-9-]{36}$/i.test(participantId || '')) {
+      participantId = uid(); save(key, participantId);
+    }
+    Object.assign(state, { room, hostToken: null, participantId, role: 'student', demo: false, batches: [], myCount: 0 });
+    showScreen('student-screen');
+    updateURL(`s=${room.code}`);
+    setTop('Participando ao vivo');
+    updateRoomUI();
+    connectRealtime();
+    await refreshBatchData();
+  }
+  function disconnect() {
+    if (state.pollTimer) clearInterval(state.pollTimer);
+    if (state.refreshTimer) clearTimeout(state.refreshTimer);
+    if (state.channel && supabaseClient) supabaseClient.removeChannel(state.channel);
+    state.pollTimer = null; state.channel = null; state.refreshTimer = null;
+  }
+  function connectRealtime() {
+    if (!supabaseClient || !state.room || state.demo) return;
+    const id = state.room.id;
+    const channel = supabaseClient.channel(`gama-${id}-${uid().slice(0,8)}`);
+    channel.on('postgres_changes', {
+      event: 'UPDATE', schema: 'public', table: 'gama_rooms', filter: `id=eq.${id}`
+    }, ({new: room}) => {
+      if (state.room?.id !== id) return;
+      const reset = state.room.epoch !== room.epoch;
+      state.room = room;
+      updateRoomUI();
+      if (reset) state.myCount = 0;
+      scheduleRefresh(250);
+    });
+    channel.on('postgres_changes', {
+      event: 'INSERT', schema: 'public', table: 'gama_batches', filter: `room_id=eq.${id}`
+    }, () => { scheduleRefresh(350); });
+    channel.subscribe(status => {
+      if (status === 'SUBSCRIBED') setTop('Conectado ao experimento');
+      if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') setTop('Reconectando…');
+    });
+    state.channel = channel;
+    state.pollTimer = setInterval(async () => {
+      if (!state.room || state.room.id !== id) return;
+      try {
+        const room = await fetchRoom(state.room.code);
+        const reset = state.room.epoch !== room.epoch;
+        state.room = room;
+        if (reset) state.myCount = 0;
+        updateRoomUI();
+        await refreshBatchData();
+      } catch (_) { setTop('Conexão instável · tentando novamente'); }
+    }, state.role === 'host' ? 7000 : 12000);
+  }
+  function scheduleRefresh(delay) {
+    clearTimeout(state.refreshTimer);
+    state.refreshTimer = setTimeout(refreshBatchData, delay);
+  }
+  async function refreshBatchData() {
+    if (state.demo || !supabaseClient || !state.room) return;
+    if (state.loadingBatches) { state.loadAgain = true; return; }
+    state.loadingBatches = true;
+    const roomId = state.room.id;
+    const epoch = state.room.epoch;
+    try {
+      let rows = [], offset = 0;
+      do {
+        const {data, error} = await supabaseClient.from('gama_batches')
+          .select('id,epoch,participant_id,amostras')
+          .eq('room_id', roomId).eq('epoch', epoch)
+          .order('id', {ascending:true}).range(offset, offset + 999);
+        if (error) throw error;
+        rows.push(...(data || []));
+        if (!data || data.length < 1000) break;
+        offset += 1000;
+      } while(offset < 10000);
+      if (state.room?.id !== roomId || state.room.epoch !== epoch) return;
+      state.batches = rows;
+      if (state.role === 'student') state.myCount = rows
+        .filter(r => r.participant_id === state.participantId)
+        .reduce((s,r) => s + (r.amostras?.length || 0), 0);
+      renderStats();
+      if (state.role === 'student') updateStudentCounters();
+    } catch (e) {
+      setTop('Dados em atualização');
+      console.warn('Falha ao atualizar a amostra:', e);
+    } finally {
+      state.loadingBatches = false;
+      if (state.loadAgain) { state.loadAgain = false; scheduleRefresh(200); }
+    }
+  }
+  function renderQR(url) {
+    const block = $('qr-code'); block.textContent = '';
+    if (window.QRCode) {
+      new window.QRCode(block, {text:url,width:168,height:168,
+        colorDark:'#0b2031', colorLight:'#ffffff',correctLevel:window.QRCode.CorrectLevel.M});
+    } else {
+      block.textContent = 'QR indisponível; use o link de participação.';
+    }
+  }
+  function roomDataChanged() {
+    updateRoomUI(); renderStats();
+  }
+  function updateRoomUI() {
+    const r = state.room; if (!r) return;
+    const isOpen = available(r);
+    if (state.role === 'host') {
+      $('display-code').textContent = r.code;
+      const joinLink = $('join-link');
+      joinLink.textContent = state.demo ? 'Sem link público na demonstração' : joinUrl(r.code);
+      joinLink.href = state.demo ? '#' : joinUrl(r.code);
+      joinLink.setAttribute('aria-disabled', state.demo ? 'true' : 'false');
+      $('session-state').textContent = isOpen ? 'Sala aberta' : 'Sala encerrada';
+      $('session-state').className = `pill ${isOpen ? 'pill-open' : 'pill-closed'}`;
+      $('toggle-room').textContent = isOpen ? 'Encerrar sala' : 'Reabrir sala';
+      $('toggle-room').disabled = new Date(r.expires_at).getTime() <= Date.now();
+      $('cfg-mode').value = r.modo;
+      $('cfg-alpha').value = r.alpha;
+      $('cfg-theta').value = r.theta;
+      $('cfg-dry').value = Math.round(r.seca * 100);
+      $('cfg-a').value = r.limit_a;
+      $('cfg-b').value = r.limit_b;
+      $('dry-field').hidden = r.modo !== 'mes';
+      $('theory-legend').hidden = r.modo !== 'dia';
+      $('chart-title').textContent = r.modo === 'dia' ? 'Volume de chuva em dias chuvosos' : 'Total de chuva em janeiro (31 dias)';
+      $('explain-title').textContent = r.modo === 'dia' ? 'Por que a curva é assimétrica?' : 'Por que não há uma curva gama neste modo?';
+      $('model-explanation').textContent = r.modo === 'dia'
+        ? 'O modelo gama é contínuo e descreve volumes positivos. Quando α é menor do que 1, a curva tem densidade mais alta perto de zero e cauda à direita. Não representa dias sem chuva.'
+        : 'Cada dia é seco com uma probabilidade fixa ou, quando chove, tem volume gama. A soma de 31 dias segue um modelo misto: seu total mensal não é, em geral, distribuído como uma única gama.';
+    } else if (state.role === 'student') {
+      $('student-code').textContent = r.code;
+      $('student-status').textContent = isOpen ? 'Recebendo dados' : 'Sala encerrada';
+      $('student-status').className = `pill ${isOpen ? 'pill-open' : 'pill-closed'}`;
+      $('student-context').textContent = r.modo === 'dia'
+        ? 'Cada experimento gera o volume de chuva de um dia chuvoso.'
+        : 'Cada experimento gera o volume de chuva acumulado em um janeiro de 31 dias.';
+      $('student-model-help').textContent = r.modo === 'dia'
+        ? `O servidor sorteia volumes gama com forma α=${fmt(r.alpha)} e escala θ=${fmt(r.theta)} mm. A média teórica por dia chuvoso é ${fmt(r.alpha*r.theta)} mm. Não são incluídos dias secos.`
+        : `Cada um dos 31 dias tem ${fmt(r.seca*100,0)}% de probabilidade de ser seco. Quando chove, o volume segue Gama(α=${fmt(r.alpha)}, θ=${fmt(r.theta)} mm). O total mensal é uma soma mista, não uma única gama.`;
+      setBusy(state.busy);
+      updateStudentCounters();
+    }
+    if (state.role === 'host') renderStats();
+  }
+
+  // --- Painel, estimativas empíricas e gráfico SVG sem dependências ---
+  function aggregate() {
+    const values = state.batches.flatMap(b => (b.amostras || []).map(Number).filter(Number.isFinite));
+    const r = state.room || defaultRoom(), n = values.length;
+    const mean = n ? values.reduce((s,v) => s + v,0)/n : 0;
+    const exceedA = n ? values.filter(v => v > r.limit_a).length/n : 0;
+    const exceedB = n ? values.filter(v => v > r.limit_b).length/n : 0;
+    const members = new Set(state.batches.map(b => b.participant_id)).size;
+    return {values, n, mean, exceedA, exceedB, members};
+  }
+  function renderStats() {
+    if (!state.room || state.role !== 'host') return;
+    const r = state.room, a = aggregate();
+    const daily = r.modo === 'dia';
+    const expected = daily ? r.alpha*r.theta : 31*(1-r.seca)*r.alpha*r.theta;
+    $('stat-count').textContent = a.n.toLocaleString('pt-BR');
+    $('stat-contributors').textContent = state.demo ? 'Apenas neste navegador' : `${a.members} dispositivo(s) contribuíram`;
+    $('stat-mean').textContent = a.n ? `${fmt(a.mean)} mm` : '—';
+    $('stat-theory-mean').textContent = `Média teórica: ${fmt(expected)} mm`;
+    document.querySelectorAll('.stat-threshold').forEach(el => el.textContent = fmt(r.limit_a,0));
+    document.querySelectorAll('.stat-threshold-b').forEach(el => el.textContent = fmt(r.limit_b,0));
+    $('stat-tail').textContent = a.n ? pc(a.exceedA) : '—';
+    $('stat-tail-b').textContent = a.n ? pc(a.exceedB) : '—';
+    $('stat-theory-tail').textContent = daily ? `Teoria gama: ${pc(gammaTail(r.limit_a,r.alpha,r.theta))}` : 'Modelo mensal: comparar pela simulação';
+    $('stat-theory-tail-b').textContent = daily ? `Teoria gama: ${pc(gammaTail(r.limit_b,r.alpha,r.theta))}` : 'Modelo mensal: sem fórmula gama simples';
+    drawChart(r, a);
+  }
+  function drawChart(r, a) {
+    const svg = $('main-chart'), n = a.n;
+    const width=900,height=360,margin={left:54,right:15,top:14,bottom:46};
+    const cw=width-margin.left-margin.right, ch=height-margin.top-margin.bottom;
+    const bins=26;
+    let predictedMax = r.modo === 'dia' ? gammaQuantile(.997,r.alpha,r.theta)
+      : Math.max(1,31*(1-r.seca)*r.alpha*r.theta*1.9);
+    const sorted = [...a.values].sort((x,y)=>x-y);
+    const p995 = sorted.length ? sorted[Math.min(sorted.length-1,Math.floor(sorted.length*.995))] : 0;
+    const xMax = Math.max(2, predictedMax*1.06, p995*1.1);
+    const step=xMax/bins;
+    const counts=Array(bins).fill(0), theories=[];
+    let outside = 0;
+    for(const v of a.values) {
+      const idx = Math.floor(v / step);
+      if (idx >= bins) outside++;
+      else counts[Math.max(0, idx)]++;
+    }
+    for(let i=0;i<bins;i++) theories.push(r.modo==='dia' ?
+      Math.max(0,gammaCDF((i+1)*step,r.alpha,r.theta)-gammaCDF(i*step,r.alpha,r.theta))/step : 0);
+    const densities=counts.map(c=>n?c/(n*step):0);
+    let yMax=Math.max(...densities,...theories,0.000001)*1.16;
+    const xScale=x=>margin.left+x/xMax*cw;
+    const yScale=y=>margin.top+ch-(y/yMax)*ch;
+    let parts=[];
+    parts.push(`<title id="grafico-titulo">Histograma de chuva simulada</title>`);
+    parts.push(`<desc id="grafico-descricao">${n} observações. Média ${n?fmt(a.mean):'ainda não calculada'} milímetros. ${r.modo==='dia'?'Linha laranja representa a gama teórica calculada como densidade média por intervalo.':'Modo mensal misto: apenas frequências simuladas, sem curva gama teórica.'} Uma tabela acessível detalha todos os intervalos após o gráfico.</desc>`);
+    for(let i=0;i<=4;i++) {
+      const y=i*yMax/4, yy=yScale(y);
+      parts.push(`<line x1="${margin.left}" y1="${yy.toFixed(2)}" x2="${width-margin.right}" y2="${yy.toFixed(2)}" stroke="#315062" stroke-width="1" opacity=".7" />`);
+      parts.push(`<text x="${margin.left-9}" y="${(yy+4).toFixed(2)}" text-anchor="end" fill="#99b3c0" font-size="11">${fmt(y,3)}</text>`);
+    }
+    for(let i=0;i<=5;i++) {
+      const x=i*xMax/5, xx=xScale(x);
+      parts.push(`<text x="${xx.toFixed(2)}" y="${height-19}" text-anchor="middle" fill="#abc0cb" font-size="12">${fmt(x,0)}</text>`);
+    }
+    parts.push(`<text x="${margin.left+cw/2}" y="${height-1}" text-anchor="middle" fill="#9cb5c2" font-size="12">Precipitação (milímetros)</text>`);
+    parts.push(`<text transform="translate(14 ${height/2}) rotate(-90)" text-anchor="middle" fill="#9cb5c2" font-size="12">Densidade relativa</text>`);
+    for(let i=0;i<bins;i++) {
+      const barW=Math.max(1,cw/bins-2.5),barX=margin.left+i*cw/bins+1.25,
+        barH=Math.max(0,ch-(yScale(densities[i])-margin.top));
+      parts.push(`<rect x="${barX.toFixed(2)}" y="${yScale(densities[i]).toFixed(2)}" width="${barW.toFixed(2)}" height="${barH.toFixed(2)}" rx="2" fill="#4ca8c1" opacity=".78"><title>${fmt(i*step)} a ${fmt((i+1)*step)} mm: ${counts[i]} observações</title></rect>`);
+    }
+    if(r.modo==='dia') {
+      // Ligação entre densidades teóricas médias dos mesmos intervalos,
+      // evitando a singularidade no eixo zero para alpha menor do que 1.
+      const line=theories.map((v,i)=>`${i?'L':'M'} ${xScale((i+.5)*step).toFixed(2)} ${yScale(v).toFixed(2)}`).join(' ');
+      parts.push(`<path d="${line}" fill="none" stroke="#ffbc73" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" />`);
+    }
+    if(r.limit_a<xMax) {
+      const x=xScale(r.limit_a);
+      parts.push(`<line x1="${x}" x2="${x}" y1="${margin.top}" y2="${margin.top+ch}" stroke="#9f9bf9" stroke-width="2" stroke-dasharray="5 6" />`);
+      parts.push(`<text x="${Math.min(width-20,x+6)}" y="25" fill="#d8d4ff" font-size="11">${fmt(r.limit_a,0)} mm</text>`);
+    }
+    svg.innerHTML=parts.join('');
+    const tbody=$('histogram-rows'); tbody.replaceChildren();
+    counts.forEach((count,i)=>{
+      const tr=document.createElement('tr');
+      for(const value of [`${fmt(i*step)} – ${fmt((i+1)*step)} mm`,String(count), n?pc(count/n):'—']){
+        const td=document.createElement('td');td.textContent=value;tr.appendChild(td);
+      }
+      tbody.appendChild(tr);
+    });
+    if (outside) {
+      const tr=document.createElement('tr');
+      for (const value of [`Acima de ${fmt(xMax)} mm (fora do gráfico)`, String(outside), pc(outside/n)]) {
+        const td=document.createElement('td');td.textContent=value;tr.appendChild(td);
+      }
+      tbody.appendChild(tr);
+    }
+    const note=n===0
+      ? 'Nenhum experimento recebido ainda. A linha laranja representa o modelo teórico (somente no modo diário).'
+      : `${n.toLocaleString('pt-BR')} resultados de ${a.members} dispositivo(s). Média observada: ${fmt(a.mean)} mm. Acima de ${fmt(r.limit_a,0)} mm: ${pc(a.exceedA)}. ${outside ? `${outside} valor(es) extremos aparecem na tabela, fora da escala do gráfico. ` : ''}${r.modo==='dia'?'A linha laranja é a densidade teórica média em cada intervalo do histograma.':'Não desenhamos curva gama teórica, pois o total mensal mistura dias secos e dias com chuva.'}`;
+    $('chart-note').textContent=note;
+  }
+  function updateStudentCounters() {
+    const a=aggregate();
+    $('my-count').textContent=state.myCount.toLocaleString('pt-BR');
+    $('class-count').textContent=Math.max(a.n,state.room?.total_samples||0).toLocaleString('pt-BR');
+  }
+
+  // --- Ações do apresentador ---
+  async function createRoom(event) {
+    event.preventDefault();
+    if(!supabaseClient) {toast('Configure o Supabase para criar salas compartilhadas. Você pode testar a demonstração.');return;}
+    const pin=$('host-pin').value;
+    const button=$('create-form').querySelector('button');button.disabled=true;
+    try {
+      const {data,error}=await supabaseClient.rpc('gama_create_room',{p_host_pin:pin});
+      if(error) throw error;
+      save(`gama_host_${data.code}`,data.token);
+      $('host-pin').value='';
+      await enterHost(await fetchRoom(data.code),data.token);
+      toast('Sala criada. Projete o QR code para os alunos.');
+    }catch(e){toast(checkError(e));}finally{button.disabled=false;}
+  }
+  async function joinRoom(event) {
+    if(event)event.preventDefault();
+    const code=$('room-code').value.trim().toUpperCase();
+    if(!/^[0-9A-F]{8}$/.test(code)){toast('Digite um código válido com 8 caracteres hexadecimais.');return;}
+    try {await enterStudent(await fetchRoom(code));}
+    catch(e){toast(checkError(e));}
+  }
+  function updateConfigFormForMode() {
+    const monthly=$('cfg-mode').value==='mes';
+    $('dry-field').hidden=!monthly;
+    $('cfg-a').value=monthly?250:30;
+    $('cfg-b').value=monthly?300:50;
+  }
+  async function applySettings(event) {
+    event.preventDefault();
+    const r=state.room;if(!r)return;
+    const modo=$('cfg-mode').value,alpha=+$('cfg-alpha').value,theta=+$('cfg-theta').value,
+      seca=+$('cfg-dry').value/100,a=+$('cfg-a').value,b=+$('cfg-b').value;
+    if(!(alpha>=.2&&alpha<=8&&theta>=.5&&theta<=100&&seca>=0&&seca<=.95&&a>0&&b>a&&b<=5000)){
+      toast('Revise os parâmetros. O segundo limite deve ser maior que o primeiro.');return;
+    }
+    if(!window.confirm('Aplicar a nova configuração e limpar todas as simulações desta rodada?'))return;
+    const button=$('apply-settings');button.disabled=true;
+    try{
+      if(state.demo) {
+        Object.assign(r,{modo,alpha,theta,seca,limit_a:a,limit_b:b,epoch:r.epoch+1,total_samples:0});
+        state.batches=[];roomDataChanged();
+      }else{
+        const {error}=await supabaseClient.rpc('gama_update_room',{
+          p_code:r.code,p_host_token:state.hostToken,p_modo:modo,p_alpha:alpha,p_theta:theta,
+          p_seca:seca,p_limit_a:a,p_limit_b:b
+        });
+        if(error)throw error;
+        state.room=await fetchRoom(r.code);
+        state.batches=[];roomDataChanged();await refreshBatchData();
+      }
+      toast('Nova configuração aplicada. O histograma recomeçou do zero.');
+    }catch(e){toast(checkError(e));}finally{button.disabled=false;}
+  }
+  async function roomAction(action) {
+    const r=state.room;if(!r)return;
+    const questions={limpar:'Apagar todas as simulações e iniciar uma nova rodada?',
+      encerrar:'Encerrar a sala e bloquear novas simulações?',reabrir:'Reabrir a sala para receber simulações?'};
+    if(!window.confirm(questions[action]))return;
+    try{
+      if(state.demo){
+        if(action==='limpar'){r.epoch++;r.total_samples=0;state.batches=[];}
+        else r.status=action==='encerrar'?'encerrada':'aberta';
+      }else{
+        const {error}=await supabaseClient.rpc('gama_room_action',{
+          p_code:r.code,p_host_token:state.hostToken,p_action:action});
+        if(error)throw error;
+        state.room=await fetchRoom(r.code);
+        if(action==='limpar')state.batches=[];
+      }
+      roomDataChanged();
+      if(!state.demo)await refreshBatchData();
+      toast(action==='limpar'?'Gráfico reiniciado.':action==='encerrar'?'Sala encerrada.':'Sala reaberta.');
+    }catch(e){toast(checkError(e));}
+  }
+  function addDemo(n) {
+    const r=state.room;if(!r||!available(r))return;
+    const samples=simulateLocal(r,n);
+    state.batches.push({participant_id:'demo-local',amostras:samples,id:++state.demoCounter,epoch:r.epoch});
+    r.total_samples+=n;
+    roomDataChanged();
+  }
+  async function submitBatch(n) {
+    if(state.busy||!state.room||!available(state.room))return;
+    setBusy(true);$('student-feedback').textContent=`Gerando ${n} experimento(s) no servidor…`;
+    try{
+      const roomCode=state.room.code;
+      const {data,error}=await supabaseClient.rpc('gama_submit',{
+        p_code:roomCode,p_participant_id:state.participantId,p_request_id:uid(),p_count:n
+      });
+      if(error)throw error;
+      const values=data.amostras.map(Number);
+      const last=values[values.length-1];
+      $('student-last').textContent=`${fmt(last,1)} mm`;
+      $('student-last-label').textContent=state.room.modo==='dia'?'Volume sorteado para um dia chuvoso':'Acumulado em um janeiro simulado';
+      $('student-feedback').textContent=`${n} simulação(ões) enviada(s)! Média deste lote: ${fmt(values.reduce((s,v)=>s+v,0)/values.length)} mm.`;
+      state.room.total_samples=Math.max(state.room.total_samples,data.total);
+      await refreshBatchData();
+    }catch(e){$('student-feedback').textContent=checkError(e);}
+    finally{setBusy(false);}
+  }
+  function leave() {disconnect();state.room=null;state.role=null;state.demo=false;state.batches=[];updateURL(null);showScreen('landing');setTop('Pronto para começar');}
+
+  function hookEvents() {
+    $('create-form').addEventListener('submit',createRoom);
+    $('join-form').addEventListener('submit',joinRoom);
+    $('demo-start').addEventListener('click',()=>enterHost(defaultRoom(),null,true));
+    $('copy-link').addEventListener('click',async()=>{
+      if(state.demo)return;
+      const url=joinUrl(state.room.code);
+      try{await navigator.clipboard.writeText(url);toast('Link de participação copiado.');}
+      catch(_){window.prompt('Copie o link dos alunos:',url);}
+    });
+    $('cfg-mode').addEventListener('change',updateConfigFormForMode);
+    $('settings-form').addEventListener('submit',applySettings);
+    $('clear-room').addEventListener('click',()=>roomAction('limpar'));
+    $('toggle-room').addEventListener('click',()=>roomAction(available(state.room)?'encerrar':'reabrir'));
+    $('leave-host').addEventListener('click',leave);
+    $('leave-student').addEventListener('click',leave);
+    $('simulate-demo-1').addEventListener('click',()=>addDemo(10));
+    $('simulate-demo-50').addEventListener('click',()=>addDemo(50));
+    document.querySelectorAll('.simulation-button').forEach(button=>{
+      button.addEventListener('click',()=>submitBatch(Number(button.dataset.n)));
+    });
+  }
+  async function init() {
+    hookEvents();
+    if(!supabaseClient){$('setup-warning').hidden=false;setTop('Configuração pendente');}
+    const params=new URLSearchParams(location.search);
+    if(params.get('demo')==='1'){await enterHost(defaultRoom(),null,true);return;}
+    const s=params.get('s');
+    if(s){
+      $('room-code').value=s.toUpperCase();
+      if(supabaseClient){try{await enterStudent(await fetchRoom(s));}catch(e){toast(checkError(e));}}
+      return;
+    }
+    const host=params.get('painel');
+    if(host&&supabaseClient){
+      const token=restore(`gama_host_${host}`);
+      if(token){try{await enterHost(await fetchRoom(host),token);return;}catch(e){toast(checkError(e));}}
+      else toast('O acesso ao painel está disponível somente no navegador em que a sala foi criada.');
+    }
+  }
+  init().catch(e=>{console.error(e);toast(checkError(e));});
 })();
