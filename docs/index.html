@@ -3,13 +3,15 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <meta name="theme-color" content="#081929" />
+  <meta name="theme-color" content="#f4f6f9" />
   <meta name="description" content="Experimento coletivo e acessível de distribuição gama: alunos simulam chuvas e o gráfico da turma evolui ao vivo." />
   <title>GamaLab | Laboratório coletivo de chuva</title>
   <link rel="stylesheet" href="styles.css" />
+  <script src="theme.js"></script>
   <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script defer src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
   <script defer src="config.js"></script>
+  <script defer src="gamma-math.js"></script>
   <script defer src="app.js"></script>
 </head>
 <body>
@@ -17,10 +19,11 @@
   <header class="topbar">
     <a class="brand" href="./" aria-label="GamaLab, início"><span class="brand-icon" aria-hidden="true">◈</span><span>Gama<span class="brand-accent">Lab</span></span></a>
     <span class="top-caption">LABORATÓRIO DE PROBABILIDADE <span class="dot">•</span> DISTRIBUIÇÃO GAMA</span>
-    <span id="top-status" class="connection-tag" aria-live="polite">Pronto para começar</span>
+    <div class="top-actions"><span id="top-status" class="connection-tag" aria-live="polite">Pronto para começar</span><button id="theme-toggle" class="btn btn-small btn-outline" type="button" aria-pressed="false">Tema escuro</button></div>
   </header>
 
   <main id="conteudo">
+    <nav id="module-nav" class="page-wrap module-nav" aria-label="Áreas do GamaLab"><span>Experimento coletivo</span><a class="btn btn-outline" href="comparison.html" target="_blank" rel="noopener">Comparar parâmetros ↗ <span class="sr-only">(abre em outra aba)</span></a></nav>
     <section id="landing" class="page-wrap screen">
       <div class="hero">
         <div class="eyebrow"><span class="live-dot"></span> EXPERIMENTO COLETIVO · SEM INSTALAÇÃO</div>
@@ -56,6 +59,7 @@
       </div>
       <div class="landing-footer">
         <button class="text-link" id="demo-start" type="button">Explorar demonstração sem servidor <span aria-hidden="true">↗</span></button>
+        <button class="text-link" id="student-preview" type="button">Testar tela do aluno e chuva</button>
         <span>Sem login · Não solicitamos nomes ou e-mails</span>
       </div>
     </section>
@@ -146,10 +150,14 @@
     </section>
 
     <section id="student-screen" class="screen page-wrap student-wrap" hidden>
-      <div class="student-heading"><span class="eyebrow"><span class="live-dot"></span> EXPERIMENTO EM ANDAMENTO</span><h1>Faça <span class="gradient">chover.</span></h1><p id="student-context">Cada clique gera novos resultados e os adiciona automaticamente ao gráfico projetado.</p></div>
       <div class="panel student-main">
-        <div class="student-room-line"><span>Código: <strong id="student-code">--------</strong></span><span id="student-status" class="pill pill-open">Recebendo dados</span></div>
-        <div class="student-weather"><span aria-hidden="true">☁</span><div><div class="micro">SUA ÚLTIMA SIMULAÇÃO</div><strong id="student-last">—</strong><div id="student-last-label" class="helper">Toque em um botão para começar.</div></div></div>
+        <div class="student-room-line"><span class="student-brand">GamaLab</span><span class="student-code-badge">Sala <strong id="student-code">--------</strong></span></div>
+        <div class="student-heading"><h1>Faça parte da amostra.</h1><p id="student-context">Cada experimento contribui para o gráfico da turma.</p></div>
+        <span id="student-status" class="pill pill-open">Recebendo dados</span>
+        <div id="weather-scene" class="weather-scene" aria-hidden="true">
+          <div class="weather-cloud"></div>
+          <div id="weather-rain"></div><span id="rain-activity" class="weather-caption">Chuva suave · aguardando</span>
+        </div>
         <h2>Quantos experimentos deseja gerar?</h2>
         <div class="student-buttons">
           <button class="simulation-button" type="button" data-n="1"><strong>1</strong><span>experimento</span></button>
@@ -158,6 +166,9 @@
         </div>
         <p id="student-feedback" class="feedback" role="status" aria-live="polite">Sem aprovação: seus resultados entram automaticamente no gráfico projetado.</p>
         <div class="student-totals"><div><div class="micro">VOCÊ CONTRIBUIU</div><strong id="my-count">0</strong><span>resultados nesta rodada</span></div><div><div class="micro">TODA A TURMA</div><strong id="class-count">0</strong><span>resultados coletivos</span></div></div>
+        <div class="student-weather"><div><div class="micro">ÚLTIMO RESULTADO</div><strong id="student-last">—</strong><div id="student-last-label" class="helper">O volume sorteado aparecerá aqui.</div></div></div>
+        <p class="helper rain-explanation">A chuva representa atividade, não o volume sorteado. O resultado da simulação é informado em milímetros.</p>
+        <div class="weather-controls"><button id="pause-rain" class="text-link" type="button" aria-pressed="false">Pausar animação da chuva</button></div>
         <details class="student-about"><summary>Entenda como os números são sorteados</summary><p id="student-model-help">Os volumes são sorteados segundo uma distribuição gama com parâmetros escolhidos na tela de projeção. A média teórica é alfa vezes teta.</p></details>
         <button id="leave-student" class="text-link" type="button">Sair da sala</button>
       </div>
@@ -166,3 +177,4 @@
   <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
 </body>
 </html>
+
