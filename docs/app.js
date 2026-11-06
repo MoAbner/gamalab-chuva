@@ -53,6 +53,7 @@
     clearTimeout(toastTimer); toastTimer = setTimeout(() => { el.hidden = true; }, 6500);
   }
   function showScreen(name) {
+    setDashboardFocus(false);
     document.body.classList.toggle('student-view', name === 'student-screen');
     ['landing', 'host-screen', 'student-screen'].forEach(id => { $(id).hidden = id !== name; });
     window.scrollTo({ top: 0, behavior: 'instant' });
@@ -516,8 +517,28 @@
   }
   function leave() {resetRain();disconnect();state.room=null;state.role=null;state.demo=false;state.batches=[];updateURL(null);showScreen('landing');setTop('Pronto para começar');}
 
+  function setDashboardFocus(active) {
+    document.body.classList.toggle('dashboard-focus', active);
+    $('focus-dashboard').setAttribute('aria-pressed', String(active));
+    $('focus-dashboard').textContent = active ? 'Voltar ao painel (Esc)' : 'Enquadrar painel (PgDn)';
+  }
+
   function hookEvents() {
     setupRain();
+    $('focus-dashboard').addEventListener('click', () => {
+      setDashboardFocus($('focus-dashboard').getAttribute('aria-pressed') !== 'true');
+    });
+    document.body.addEventListener('keydown', event => {
+      if (state.role !== 'host' || event.defaultPrevented || event.ctrlKey || event.altKey || event.metaKey) return;
+      if (event.target.closest('input, select, textarea, [contenteditable="true"]')) return;
+      if (event.key === 'PageDown') {
+        event.preventDefault();
+        setDashboardFocus(true);
+        $('focus-dashboard').focus({ preventScroll: true });
+      } else if (event.key === 'Escape') {
+        setDashboardFocus(false);
+      }
+    });
     $('create-form').addEventListener('submit',createRoom);
     $('join-form').addEventListener('submit',joinRoom);
     $('demo-start').addEventListener('click',()=>enterHost(defaultRoom(),null,true));
