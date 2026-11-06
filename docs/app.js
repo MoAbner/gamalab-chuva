@@ -21,78 +21,7 @@
     demo: false, batches: [], channel: null, pollTimer: null, refreshTimer: null,
     loadingBatches: false, loadAgain: false, demoCounter: 0, busy: false, myCount: 0 };
 
-  // --- Estatística: Gama, função gama incompleta e experimentos locais ---
-  function logGamma(z) {
-    const p = [0.99999999999980993, 676.5203681218851, -1259.1392167224028,
-      771.32342877765313, -176.6150291621406, 12.507343278686905,
-      -0.13857109526572012, 9.9843695780195716e-6, 1.5056327351493116e-7];
-    if (z < 0.5) return Math.log(Math.PI) - Math.log(Math.sin(Math.PI * z)) - logGamma(1 - z);
-    z -= 1;
-    let x = p[0];
-    for (let i = 1; i < p.length; i++) x += p[i] / (z + i);
-    const t = z + 7.5;
-    return 0.5 * Math.log(2 * Math.PI) + (z + 0.5) * Math.log(t) - t + Math.log(x);
-  }
-  function gammaP(a, x) {
-    if (x <= 0) return 0;
-    if (x < a + 1) {
-      let sum = 1 / a, d = sum;
-      for (let n = 1; n <= 300; n++) {
-        d *= x / (a + n); sum += d;
-        if (Math.abs(d) < Math.abs(sum) * 1e-14) break;
-      }
-      return Math.max(0, Math.min(1, sum * Math.exp(-x + a * Math.log(x) - logGamma(a))));
-    }
-    let b = x + 1 - a, c = 1e30, d = 1 / Math.max(b, 1e-30), h = d;
-    for (let i = 1; i <= 300; i++) {
-      const an = -i * (i - a);
-      b += 2;
-      d = an * d + b; if (Math.abs(d) < 1e-30) d = 1e-30;
-      c = b + an / c; if (Math.abs(c) < 1e-30) c = 1e-30;
-      d = 1 / d;
-      const delta = d * c;
-      h *= delta;
-      if (Math.abs(delta - 1) < 1e-14) break;
-    }
-    const q = h * Math.exp(-x + a * Math.log(x) - logGamma(a));
-    return Math.max(0, Math.min(1, 1 - q));
-  }
-  function gammaCDF(x, alpha, theta) { return gammaP(alpha, x / theta); }
-  function gammaTail(x, alpha, theta) { return 1 - gammaCDF(x, alpha, theta); }
-  function gammaQuantile(q, alpha, theta) {
-    let hi = Math.max(theta * alpha, theta);
-    while (gammaCDF(hi, alpha, theta) < q && hi < 1e9) hi *= 2;
-    let lo = 0;
-    for (let i = 0; i < 75; i++) {
-      const mid = (lo + hi) / 2;
-      if (gammaCDF(mid, alpha, theta) < q) lo = mid; else hi = mid;
-    }
-    return (lo + hi) / 2;
-  }
-  function gammaSample(alpha, theta, rng = Math.random) {
-    if (alpha < 1) return gammaSample(alpha + 1, theta, rng) * Math.pow(Math.max(rng(), 1e-15), 1 / alpha);
-    const d = alpha - 1 / 3, c = 1 / Math.sqrt(9 * d);
-    while (true) {
-      const x = Math.sqrt(-2 * Math.log(Math.max(rng(), 1e-15))) * Math.cos(2 * Math.PI * rng());
-      const v0 = 1 + c * x;
-      if (v0 <= 0) continue;
-      const v = v0 * v0 * v0, u = Math.max(rng(), 1e-15);
-      if (u < 1 - 0.0331 * x ** 4 || Math.log(u) < 0.5 * x * x + d * (1 - v + Math.log(v))) return theta * d * v;
-    }
-  }
-  function simulateLocal(room, n) {
-    const list = [];
-    for (let i = 0; i < n; i++) {
-      if (room.modo === 'dia') list.push(gammaSample(room.alpha, room.theta));
-      else {
-        let total = 0;
-        for (let day = 0; day < 31; day++) if (Math.random() >= room.seca) total += gammaSample(room.alpha, room.theta);
-        list.push(total);
-      }
-    }
-    return list;
-  }
-  window.GamaMath = { logGamma, gammaP, gammaCDF, gammaTail, gammaQuantile, gammaSample, simulateLocal };
+  const { logGamma, gammaP, gammaCDF, gammaTail, gammaQuantile, gammaSample, simulateLocal } = window.GamaMath;
 
   function defaultRoom() {
     return { id: 'demo', code: 'DEMO', status: 'aberta', modo: 'dia', alpha: 0.8,
@@ -108,13 +37,23 @@
     });
   }
   function baseUrl() { return location.href.split('?')[0].split('#')[0]; }
-  function joinUrl(code) { return `${baseUrl()}?s=${encodeURIComponent(code)}`; }
+  function joinUrl(code) {
+    // A loopback address belongs to each device, so phones need the public site.
+    const local = location.protocol === 'file:' ||
+      /^(localhost|127(?:\.\d{1,3}){3}|\[?::1\]?)$/i.test(location.hostname);
+    const url = new URL(local && config.publicSiteUrl ? config.publicSiteUrl : baseUrl());
+    url.search = '';
+    url.hash = '';
+    url.searchParams.set('s', code);
+    return url.href;
+  }
   let toastTimer;
   function toast(text) {
     const el = $('toast'); el.textContent = text; el.hidden = false;
     clearTimeout(toastTimer); toastTimer = setTimeout(() => { el.hidden = true; }, 6500);
   }
   function showScreen(name) {
+    document.body.classList.toggle('student-view', name === 'student-screen');
     ['landing', 'host-screen', 'student-screen'].forEach(id => { $(id).hidden = id !== name; });
     window.scrollTo({ top: 0, behavior: 'instant' });
   }
@@ -160,6 +99,9 @@
     } else {
       updateURL(`painel=${room.code}`);
       renderQR(joinUrl(room.code));
+      if (new URL(joinUrl(room.code)).origin !== location.origin) {
+        $('link-help').textContent = 'O QR code abre o site público nos celulares. O painel continua neste computador.';
+      }
       setTop('Sala conectada');
       connectRealtime();
       await refreshBatchData();
@@ -180,6 +122,17 @@
     updateRoomUI();
     connectRealtime();
     await refreshBatchData();
+  }
+  function enterStudentPreview() {
+    disconnect();
+    Object.assign(state, { room: defaultRoom(), participantId: 'preview-local', role: 'student', demo: true, batches: [], myCount: 0 });
+    showScreen('student-screen');
+    updateRoomUI();
+    $('student-status').textContent = 'Prévia local · sem envio';
+    $('student-feedback').textContent = 'Teste 1, 10 ou 50 para ver a chuva aumentar. Nenhum dado será enviado.';
+    $('student-model-help').textContent = 'Esta prévia sorteia os volumes no navegador. Nas salas compartilhadas, os sorteios continuam no servidor.';
+    setTop('Prévia do aluno');
+    updateURL('preview=aluno');
   }
   function disconnect() {
     if (state.pollTimer) clearInterval(state.pollTimer);
@@ -365,33 +318,33 @@
     const yScale=y=>margin.top+ch-(y/yMax)*ch;
     let parts=[];
     parts.push(`<title id="grafico-titulo">Histograma de chuva simulada</title>`);
-    parts.push(`<desc id="grafico-descricao">${n} observações. Média ${n?fmt(a.mean):'ainda não calculada'} milímetros. ${r.modo==='dia'?'Linha laranja representa a gama teórica calculada como densidade média por intervalo.':'Modo mensal misto: apenas frequências simuladas, sem curva gama teórica.'} Uma tabela acessível detalha todos os intervalos após o gráfico.</desc>`);
+    parts.push(`<desc id="grafico-descricao">${n} observações. Média ${n?fmt(a.mean):'ainda não calculada'} milímetros. ${r.modo==='dia'?'Linha tracejada representa a gama teórica calculada como densidade média por intervalo.':'Modo mensal misto: apenas frequências simuladas, sem curva gama teórica.'} Uma tabela acessível detalha todos os intervalos após o gráfico.</desc>`);
     for(let i=0;i<=4;i++) {
       const y=i*yMax/4, yy=yScale(y);
-      parts.push(`<line x1="${margin.left}" y1="${yy.toFixed(2)}" x2="${width-margin.right}" y2="${yy.toFixed(2)}" stroke="#315062" stroke-width="1" opacity=".7" />`);
-      parts.push(`<text x="${margin.left-9}" y="${(yy+4).toFixed(2)}" text-anchor="end" fill="#99b3c0" font-size="11">${fmt(y,3)}</text>`);
+      parts.push(`<line x1="${margin.left}" y1="${yy.toFixed(2)}" x2="${width-margin.right}" y2="${yy.toFixed(2)}" stroke="var(--stroke)" stroke-width="1" opacity=".7" />`);
+      parts.push(`<text x="${margin.left-9}" y="${(yy+4).toFixed(2)}" text-anchor="end" fill="var(--muted)" font-size="11">${fmt(y,3)}</text>`);
     }
     for(let i=0;i<=5;i++) {
       const x=i*xMax/5, xx=xScale(x);
-      parts.push(`<text x="${xx.toFixed(2)}" y="${height-19}" text-anchor="middle" fill="#abc0cb" font-size="12">${fmt(x,0)}</text>`);
+      parts.push(`<text x="${xx.toFixed(2)}" y="${height-19}" text-anchor="middle" fill="var(--muted)" font-size="12">${fmt(x,0)}</text>`);
     }
-    parts.push(`<text x="${margin.left+cw/2}" y="${height-1}" text-anchor="middle" fill="#9cb5c2" font-size="12">Precipitação (milímetros)</text>`);
-    parts.push(`<text transform="translate(14 ${height/2}) rotate(-90)" text-anchor="middle" fill="#9cb5c2" font-size="12">Densidade relativa</text>`);
+    parts.push(`<text x="${margin.left+cw/2}" y="${height-1}" text-anchor="middle" fill="var(--muted)" font-size="12">Precipitação (milímetros)</text>`);
+    parts.push(`<text transform="translate(14 ${height/2}) rotate(-90)" text-anchor="middle" fill="var(--muted)" font-size="12">Densidade relativa</text>`);
     for(let i=0;i<bins;i++) {
       const barW=Math.max(1,cw/bins-2.5),barX=margin.left+i*cw/bins+1.25,
         barH=Math.max(0,ch-(yScale(densities[i])-margin.top));
-      parts.push(`<rect x="${barX.toFixed(2)}" y="${yScale(densities[i]).toFixed(2)}" width="${barW.toFixed(2)}" height="${barH.toFixed(2)}" rx="2" fill="#4ca8c1" opacity=".78"><title>${fmt(i*step)} a ${fmt((i+1)*step)} mm: ${counts[i]} observações</title></rect>`);
+      parts.push(`<rect x="${barX.toFixed(2)}" y="${yScale(densities[i]).toFixed(2)}" width="${barW.toFixed(2)}" height="${barH.toFixed(2)}" rx="2" fill="var(--chart-bars)" opacity=".78"><title>${fmt(i*step)} a ${fmt((i+1)*step)} mm: ${counts[i]} observações</title></rect>`);
     }
     if(r.modo==='dia') {
       // Ligação entre densidades teóricas médias dos mesmos intervalos,
       // evitando a singularidade no eixo zero para alpha menor do que 1.
       const line=theories.map((v,i)=>`${i?'L':'M'} ${xScale((i+.5)*step).toFixed(2)} ${yScale(v).toFixed(2)}`).join(' ');
-      parts.push(`<path d="${line}" fill="none" stroke="#ffbc73" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" />`);
+      parts.push(`<path d="${line}" fill="none" stroke="var(--orange)" stroke-width="3" stroke-dasharray="7 4" stroke-linecap="round" stroke-linejoin="round" />`);
     }
     if(r.limit_a<xMax) {
       const x=xScale(r.limit_a);
-      parts.push(`<line x1="${x}" x2="${x}" y1="${margin.top}" y2="${margin.top+ch}" stroke="#9f9bf9" stroke-width="2" stroke-dasharray="5 6" />`);
-      parts.push(`<text x="${Math.min(width-20,x+6)}" y="25" fill="#d8d4ff" font-size="11">${fmt(r.limit_a,0)} mm</text>`);
+      parts.push(`<line x1="${x}" x2="${x}" y1="${margin.top}" y2="${margin.top+ch}" stroke="var(--chart-limit)" stroke-width="2" stroke-dasharray="5 6" />`);
+      parts.push(`<text x="${Math.min(width-20,x+6)}" y="25" fill="var(--chart-limit)" font-size="11">${fmt(r.limit_a,0)} mm</text>`);
     }
     svg.innerHTML=parts.join('');
     const tbody=$('histogram-rows'); tbody.replaceChildren();
@@ -410,8 +363,8 @@
       tbody.appendChild(tr);
     }
     const note=n===0
-      ? 'Nenhum experimento recebido ainda. A linha laranja representa o modelo teórico (somente no modo diário).'
-      : `${n.toLocaleString('pt-BR')} resultados de ${a.members} dispositivo(s). Média observada: ${fmt(a.mean)} mm. Acima de ${fmt(r.limit_a,0)} mm: ${pc(a.exceedA)}. ${outside ? `${outside} valor(es) extremos aparecem na tabela, fora da escala do gráfico. ` : ''}${r.modo==='dia'?'A linha laranja é a densidade teórica média em cada intervalo do histograma.':'Não desenhamos curva gama teórica, pois o total mensal mistura dias secos e dias com chuva.'}`;
+      ? 'Nenhum experimento recebido ainda. A linha tracejada representa o modelo teórico (somente no modo diário).'
+      : `${n.toLocaleString('pt-BR')} resultados de ${a.members} dispositivo(s). Média observada: ${fmt(a.mean)} mm. Acima de ${fmt(r.limit_a,0)} mm: ${pc(a.exceedA)}. ${outside ? `${outside} valor(es) extremos aparecem na tabela, fora da escala do gráfico. ` : ''}${r.modo==='dia'?'A linha tracejada é a densidade teórica média em cada intervalo do histograma.':'Não desenhamos curva gama teórica, pois o total mensal mistura dias secos e dias com chuva.'}`;
     $('chart-note').textContent=note;
   }
   function updateStudentCounters() {
@@ -502,31 +455,73 @@
     r.total_samples+=n;
     roomDataChanged();
   }
+  let rainTimer;
+  function resetRain() {
+    clearTimeout(rainTimer);
+    $('weather-scene').removeAttribute('data-intensity');
+    $('rain-activity').textContent = 'Chuva suave · aguardando';
+  }
+  function animateRain(n) {
+    clearTimeout(rainTimer);
+    $('weather-scene').dataset.intensity = String(n);
+    $('rain-activity').textContent = n === 50 ? 'Chuva intensa · 50' : n === 10 ? 'Chuva moderada · 10' : 'Chuva leve · 1';
+    rainTimer = setTimeout(resetRain, n === 50 ? 6500 : 4500);
+  }
+  function setupRain() {
+    const fragment = document.createDocumentFragment();
+    for (let i = 0; i < 42; i++) {
+      const drop = document.createElement('i');
+      drop.className = 'rain-drop';
+      drop.style.setProperty('--x', `${15 + (i * 13.7) % 72}%`);
+      drop.style.setProperty('--length', `${10 + i % 4 * 3}px`);
+      drop.style.setProperty('--delay', `-${(i * .37) % 2}s`);
+      fragment.appendChild(drop);
+    }
+    $('weather-rain').appendChild(fragment);
+    $('pause-rain').addEventListener('click', () => {
+      const paused = $('weather-scene').classList.toggle('is-paused');
+      $('pause-rain').setAttribute('aria-pressed', String(paused));
+      $('pause-rain').textContent = paused ? 'Retomar animação da chuva' : 'Pausar animação da chuva';
+    });
+  }
   async function submitBatch(n) {
     if(state.busy||!state.room||!available(state.room))return;
+    animateRain(n);
     setBusy(true);$('student-feedback').textContent=`Gerando ${n} experimento(s) no servidor…`;
     try{
       const roomCode=state.room.code;
-      const {data,error}=await supabaseClient.rpc('gama_submit',{
-        p_code:roomCode,p_participant_id:state.participantId,p_request_id:uid(),p_count:n
-      });
+      let data, error;
+      if (state.demo) {
+        const samples = simulateLocal(state.room, n);
+        data = { amostras: samples, total: state.myCount + n };
+        state.batches.push({participant_id:state.participantId,amostras:samples});
+        state.myCount += n;
+      } else {
+        ({data,error}=await supabaseClient.rpc('gama_submit',{
+          p_code:roomCode,p_participant_id:state.participantId,p_request_id:uid(),p_count:n
+        }));
+      }
       if(error)throw error;
+      animateRain(n);
       const values=data.amostras.map(Number);
       const last=values[values.length-1];
       $('student-last').textContent=`${fmt(last,1)} mm`;
       $('student-last-label').textContent=state.room.modo==='dia'?'Volume sorteado para um dia chuvoso':'Acumulado em um janeiro simulado';
-      $('student-feedback').textContent=`${n} simulação(ões) enviada(s)! Média deste lote: ${fmt(values.reduce((s,v)=>s+v,0)/values.length)} mm.`;
+      $('student-feedback').textContent=`${n} simulação(ões) ${state.demo ? 'locais, sem envio' : 'enviada(s)'}! Média deste lote: ${fmt(values.reduce((s,v)=>s+v,0)/values.length)} mm.`;
       state.room.total_samples=Math.max(state.room.total_samples,data.total);
+      updateStudentCounters();
       await refreshBatchData();
-    }catch(e){$('student-feedback').textContent=checkError(e);}
+    }catch(e){resetRain();$('student-feedback').textContent=checkError(e);}
     finally{setBusy(false);}
   }
-  function leave() {disconnect();state.room=null;state.role=null;state.demo=false;state.batches=[];updateURL(null);showScreen('landing');setTop('Pronto para começar');}
+  function leave() {resetRain();disconnect();state.room=null;state.role=null;state.demo=false;state.batches=[];updateURL(null);showScreen('landing');setTop('Pronto para começar');}
 
   function hookEvents() {
+    setupRain();
     $('create-form').addEventListener('submit',createRoom);
     $('join-form').addEventListener('submit',joinRoom);
     $('demo-start').addEventListener('click',()=>enterHost(defaultRoom(),null,true));
+    $('student-preview').addEventListener('click',enterStudentPreview);
     $('copy-link').addEventListener('click',async()=>{
       if(state.demo)return;
       const url=joinUrl(state.room.code);
@@ -549,6 +544,7 @@
     hookEvents();
     if(!supabaseClient){$('setup-warning').hidden=false;setTop('Configuração pendente');}
     const params=new URLSearchParams(location.search);
+    if(params.get('preview')==='aluno'){enterStudentPreview();return;}
     if(params.get('demo')==='1'){await enterHost(defaultRoom(),null,true);return;}
     const s=params.get('s');
     if(s){
