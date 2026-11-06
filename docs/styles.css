@@ -52,19 +52,52 @@
 @media(max-width:1000px){.compare-layout{grid-template-columns:1fr}.parameter-notes{display:block}.compare-toolbar{gap:12px}}
 @media(max-width:650px){.scenario-controls{grid-template-columns:1fr}.compare-toolbar{align-items:stretch;flex-direction:column}.compare-toolbar select,.compare-toolbar input[type=number]{width:100%}.compare-legend{flex-direction:column}.comparison .chart-panel{padding:16px 8px}.comparison th,.comparison td{white-space:nowrap}.comparison .page-heading{margin-top:25px}}
 @media(prefers-reduced-motion:reduce){.rain-drop{animation:none!important;opacity:.4;top:95px}}
-/* The participant card uses the same theme tokens as the projected dashboard. */
-.student-view #module-nav{display:none}.student-view .top-caption,.student-view .connection-tag{display:none}
-.student-view .topbar{height:60px;min-height:60px}.student-wrap{max-width:410px;padding:24px 16px 40px}
-.student-main{padding:24px;border-radius:24px;box-shadow:var(--shadow)}
-.student-main .student-heading{text-align:left;padding:28px 0 0}.student-main .student-heading h1{font-size:clamp(1.7rem,6vw,2.05rem);margin:0 0 14px;letter-spacing:-.035em}.student-main .student-heading p{font-size:.78rem;line-height:1.6}
-.student-room-line{font-size:.7rem}.student-brand{font-family:Georgia,serif;font-weight:700;color:var(--text)}.student-code-badge{background:var(--bg-light);color:var(--green);border-radius:6px;padding:6px 8px}.student-room-line strong{color:inherit;letter-spacing:0}
-#student-status{margin-top:10px;font-size:.6rem;padding:3px 7px}
-.student-main .weather-scene{margin-top:16px;height:180px!important}.student-main h2{font-family:inherit;font-size:.68rem;text-transform:uppercase;letter-spacing:.12em;margin:24px 0 14px;font-weight:650}
-.student-buttons{gap:8px}.student-buttons .simulation-button{padding:12px 4px;min-height:84px}.student-buttons .simulation-button strong{font-size:1.7rem}.student-buttons .simulation-button span{font-size:.65rem}.student-buttons .simulation-button:active{transform:scale(.96)}
-.student-main .feedback{font-size:.72rem;min-height:55px;padding:14px 0 20px}
-.student-totals{display:flex;flex-direction:column;gap:10px;border-top:1px solid var(--stroke);padding-top:20px}
-.student-totals>div{background:none;border:0;border-radius:0;padding:0;display:flex;flex-direction:row;align-items:center;justify-content:space-between;gap:12px}.student-totals strong{font-size:1.5rem;color:var(--text)}.student-totals>div>span{display:none}.student-totals .micro{font-size:.59rem}
-.student-main .student-weather{text-align:left;justify-content:flex-start;padding:15px 0;margin-top:12px;border-top:1px solid var(--stroke);border-bottom:0}.student-main .student-weather>div{display:grid;grid-template-columns:1fr auto;gap:5px 12px;width:100%;align-items:center}.student-main .student-weather strong{font-family:inherit;font-size:1.2rem}.student-weather .helper{grid-column:1/-1;font-size:.68rem}
-.rain-explanation{font-size:.7rem;margin:12px 0 8px}.student-main .weather-controls .text-link{font-weight:500}.student-main .student-about{font-size:.72rem}
+/* Participant view: shared dashboard identity, sized for touch and reading. */
+.student-view #module-nav,.student-view .top-caption,.student-view .connection-tag{display:none}
+.student-view .topbar{height:auto;min-height:64px;padding:12px max(16px,env(safe-area-inset-left));gap:12px}
+.student-view .top-actions .btn{min-height:44px;font-size:.78rem;padding:10px 12px}
+.student-wrap{max-width:520px;padding:24px 16px max(32px,env(safe-area-inset-bottom))}
+.student-main{padding:24px;border-radius:10px;box-shadow:var(--shadow)}
+.student-room-line{font-size:.8rem;flex-wrap:wrap;gap:10px}
+.student-brand{font-family:Georgia,serif;font-weight:700;color:var(--green);font-size:1.1rem}
+.student-code-badge{background:var(--bg-light);color:var(--green);border:1px solid var(--stroke);border-radius:6px;padding:6px 9px}
+.student-room-line strong{color:inherit;letter-spacing:.04em;font-variant-numeric:tabular-nums}
+.student-main .student-heading{text-align:left;padding:24px 0 0}
+.student-main .student-heading h1{font-size:clamp(1.9rem,7vw,2.5rem);margin:0 0 12px;letter-spacing:-.035em}
+.student-main .student-heading p{font-size:.94rem;line-height:1.6}
+#student-status{margin-top:14px;font-size:.75rem;padding:6px 10px;white-space:normal}
+.student-main .weather-scene{margin-top:20px;height:156px!important;border:1px solid var(--stroke);border-radius:8px}
+.student-main .weather-caption{font-size:.8rem;bottom:10px;padding:0 8px}
+.student-main h2{font-family:inherit;font-size:.94rem;line-height:1.5;text-transform:none;letter-spacing:0;margin:22px 0 12px;font-weight:650}
+.student-buttons{gap:10px}
+.student-buttons .simulation-button{padding:12px 4px;min-height:94px;border-radius:7px;touch-action:manipulation}
+.student-buttons .simulation-button strong{font-size:2rem;line-height:1.2}
+.student-buttons .simulation-button span{font-size:.75rem}
+.student-buttons .simulation-button.popular{background:var(--green);border-color:var(--green);color:var(--primary-text)}
+.student-buttons .simulation-button.popular:hover:not(:disabled){background:var(--accent-hover);color:var(--primary-text)}
+.student-buttons .simulation-button:active:not(:disabled){transform:scale(.97)}
+.student-main .feedback{font-size:.85rem;line-height:1.6;min-height:70px;padding:14px 0 18px;overflow-wrap:anywhere}
+.student-totals{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;border-top:1px solid var(--stroke);padding-top:18px}
+.student-totals>div{background:var(--panel-2);border:1px solid var(--stroke);border-radius:7px;padding:14px 12px;display:flex;flex-direction:column;align-items:flex-start;gap:5px;min-width:0}
+.student-totals strong{font-size:clamp(1.4rem,6vw,1.9rem);color:var(--green);max-width:100%;overflow-wrap:anywhere;line-height:1.2}
+.student-totals>div>span{display:block;font-size:.75rem}
+.student-totals .micro{font-size:.65rem;letter-spacing:.06em}
+.student-main .student-weather{text-align:left;justify-content:flex-start;padding:18px 0;margin-top:18px;border-top:1px solid var(--stroke);border-bottom:1px solid var(--stroke)}
+.student-main .student-weather>div{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px 12px;width:100%;align-items:center}
+.student-main .student-weather strong{font-family:Georgia,serif;font-size:1.65rem;color:var(--text)}
+.student-weather .helper{grid-column:1/-1;font-size:.85rem}
+.rain-explanation{font-size:.8rem;line-height:1.6;margin:16px 0 12px}
+.student-main .weather-controls .text-link{font-weight:500;font-size:.85rem;min-height:46px;margin:0;padding:10px}
+.student-main .student-about{font-size:.85rem;line-height:1.6;padding:0;margin-top:18px}
+.student-main .student-about summary{padding:14px 0;min-height:48px}
+.student-main .student-about p{margin:0 0 14px}
+#leave-student{font-size:.85rem;min-height:48px;margin-top:8px}
 .weather-scene[data-intensity="50"] .weather-cloud{background:var(--bg-light)}
-@media(max-width:360px){.student-wrap{padding:15px 10px 30px}.student-main{padding:18px}.student-main .student-heading h1{font-size:1.75rem}}
+@media(max-width:360px){
+  .student-wrap{padding:14px 10px 28px}
+  .student-main{padding:18px}
+  .student-buttons{gap:6px}
+  .student-buttons .simulation-button span{font-size:.7rem}
+  .student-totals>div{padding:12px 9px}
+  .student-main .student-weather>div{grid-template-columns:1fr}
+}

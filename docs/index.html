@@ -151,7 +151,7 @@
 
     <section id="student-screen" class="screen page-wrap student-wrap" hidden>
       <div class="panel student-main">
-        <div class="student-room-line"><span class="student-brand">GamaLab</span><span class="student-code-badge">Sala <strong id="student-code">--------</strong></span></div>
+        <div class="student-room-line"><span class="student-brand">GamaLab &middot; Aluno</span><span class="student-code-badge">Sala <strong id="student-code">--------</strong></span></div>
         <div class="student-heading"><h1>Faça parte da amostra.</h1><p id="student-context">Cada experimento contribui para o gráfico da turma.</p></div>
         <span id="student-status" class="pill pill-open">Recebendo dados</span>
         <div id="weather-scene" class="weather-scene" aria-hidden="true">
@@ -159,12 +159,12 @@
           <div id="weather-rain"></div><span id="rain-activity" class="weather-caption">Chuva suave · aguardando</span>
         </div>
         <h2>Quantos experimentos deseja gerar?</h2>
-        <div class="student-buttons">
+        <div class="student-buttons" role="group" aria-label="Quantidade de experimentos a gerar">
           <button class="simulation-button" type="button" data-n="1"><strong>1</strong><span>experimento</span></button>
           <button class="simulation-button" type="button" data-n="10"><strong>10</strong><span>experimentos</span></button>
           <button class="simulation-button popular" type="button" data-n="50"><strong>50</strong><span>experimentos</span></button>
         </div>
-        <p id="student-feedback" class="feedback" role="status" aria-live="polite">Sem aprovação: seus resultados entram automaticamente no gráfico projetado.</p>
+        <p id="student-feedback" class="feedback" role="status" aria-live="polite">Escolha 1, 10 ou 50. Seus resultados aparecem no gráfico da turma.</p>
         <div class="student-totals"><div><div class="micro">VOCÊ CONTRIBUIU</div><strong id="my-count">0</strong><span>resultados nesta rodada</span></div><div><div class="micro">TODA A TURMA</div><strong id="class-count">0</strong><span>resultados coletivos</span></div></div>
         <div class="student-weather"><div><div class="micro">ÚLTIMO RESULTADO</div><strong id="student-last">—</strong><div id="student-last-label" class="helper">O volume sorteado aparecerá aqui.</div></div></div>
         <p class="helper rain-explanation">A chuva representa atividade, não o volume sorteado. O resultado da simulação é informado em milímetros.</p>
