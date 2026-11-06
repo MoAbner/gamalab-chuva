@@ -410,7 +410,6 @@
     if(!(alpha>=.2&&alpha<=8&&theta>=.5&&theta<=100&&seca>=0&&seca<=.95&&a>0&&b>a&&b<=5000)){
       toast('Revise os parâmetros. O segundo limite deve ser maior que o primeiro.');return;
     }
-    if(!window.confirm('Aplicar a nova configuração e limpar todas as simulações desta rodada?'))return;
     const button=$('apply-settings');button.disabled=true;
     try{
       if(state.demo) {
